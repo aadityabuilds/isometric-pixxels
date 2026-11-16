@@ -95,7 +95,9 @@ export function CampusMap({ places, imageWidth, visible, showLabels, selectedId,
   const [view, setView] = useState<View | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const callbacks = useRef({ onSelect, onReady, onError });
-  callbacks.current = { onSelect, onReady, onError };
+  useEffect(() => {
+    callbacks.current = { onSelect, onReady, onError };
+  });
 
   const sorted = useMemo(
     () =>
@@ -116,7 +118,9 @@ export function CampusMap({ places, imageWidth, visible, showLabels, selectedId,
     [places],
   );
   const hitRef = useRef(hitTargets);
-  hitRef.current = hitTargets;
+  useEffect(() => {
+    hitRef.current = hitTargets;
+  }, [hitTargets]);
 
   useEffect(() => {
     let destroyed = false;
