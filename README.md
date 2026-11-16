@@ -84,15 +84,13 @@ Tweak the region, camera angle or scale in `pipeline/stanford_pixxel/config.py`,
 
 ## Next: the AI layer
 
-The plan is to repaint this render as hand-drawn pixel art, following tiny.london's accuracy rules:
+Nano Banana 2.1 has already painted the campus (`public/tiles/*-ai/`, toggle with `L`). The original plan was
+never to keep calling Gemini: those tiles are **style targets** for a Qwen-Image-Edit-2511 LoRA.
 
-1. Cut `data/build/final.png` into overlapping 1024 px tiles (same camera, so layers, labels and the live layer line up).
-2. Make style references with an image model, using a prompt that says how to draw, never what to draw, plus
-   OpenStreetMap ground truth (water, pitches) in every prompt; reject drawings that invent water or buildings or just
-   filter the photo.
-3. Train a Qwen-Image-Edit style LoRA on Stanford's Sherlock cluster and generate the whole campus as one image in
-   overlapping windows, so there are no seams.
-4. Hand-polish landmark tiles (Hoover Tower, Memorial Church, the Main Quad), cut a second pyramid, and add a toggle.
+1. Cut paired 1024 px crops: `data/build/final.png` (control) → Nano Banana `data/ai/ai_final.png` (target).
+2. Train the LoRA on Sherlock with musubi-tuner (`experiments/qwen-lora/`).
+3. Generate the whole campus in overlapping windows (and average the overlap, so there are no seams).
+4. Keep the Nano Banana landmark tiles (Hoover, Memorial Church, the Quad) as the high-quality layer.
 
 ## Credits
 

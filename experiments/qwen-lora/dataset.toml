@@ -1,0 +1,15 @@
+# musubi-tuner dataset for Qwen-Image-Edit-2511.
+# Paths are filled by train_sherlock.sh from $PAIRS (default: data/ai/lora_pairs).
+
+[general]
+resolution = [1024, 1024]
+caption_extension = ".txt"
+batch_size = 1
+enable_bucket = false
+num_repeats = 4
+
+[[datasets]]
+image_directory = "TARGET_DIR"
+control_directory = "CONTROL_DIR"
+cache_directory = "CACHE_DIR"
+control_resolution = [1024, 1024]
