@@ -1,0 +1,17 @@
+You are drawing one finished tile of "Pixel Stanford", a giant hand-made isometric pixel-art map of Stanford University's campus, in the same craft and finish as the Pixel Chennai map.
+
+IMAGE ROLES
+- Image 1 is the LAYOUT. It is a plain 3D block render of the real campus from the map's fixed camera: orthographic, 30 degrees above the ground, turned 45 degrees to the street grid (classic 2:1 isometric). It shows the true footprint, height, roof shape and position of every building, the courtyards, roads, paths, lawns and every tree. Its walls are blank placeholders with no windows; replace them.
+- Images 2, 3 and 4 are STYLE references from Pixel Chennai. Copy only how they are drawn: crisp hard-edged pixels, clean dark outlines, a soft limited palette, flat cel shading with a lit left face and a darker right face, neatly tiled roofs, small crisp windows and arches, tidy dithered tree crowns, soft violet-grey shadows. Do not copy their buildings or their Indian architecture.
+- Images 5, 6 and 7 are PHOTOS of the real buildings in this tile: Image 5 is the Main Quad seen from the top of Hoover Tower, Image 6 is the front of Memorial Church, Image 7 is Hoover Tower.
+
+STEPS
+1. Keep the camera, the framing and every building, courtyard, road, path, lawn and tree exactly where Image 1 has them, with the same outline, height and roof shape, so the drawing lines up with Image 1 when laid over it.
+2. Dress the Main Quad buildings (the long ring of buildings around the big paved courtyard in the middle) in their real architecture from the photos: buff and tan rough-faced sandstone blocks, red clay barrel-tile hipped roofs, deep-set arched windows, and the continuous arcade of round Romanesque arches on short columns that lines the inner courtyard.
+3. Memorial Church is the large building with the tall roof at the back of the courtyard, centre-left of Image 1. Give its courtyard-facing front the real golden mosaic gable, the wide arched portal with three arches and the rose window from Image 6, foreshortened to this camera.
+4. Hoover Tower is the tall slim tower at the bottom left. Draw it as in Image 7: a slender buff sandstone shaft with vertical bands of narrow windows, an open belfry of arched openings near the top and a small red tile dome.
+5. The large paved courtyard keeps its round planted islands of palm trees exactly where Image 1 shows them.
+6. Every other pitched-roof building in the tile is buff sandstone or cream stucco with red tile roofs. Buildings with a flat grey roof in Image 1 are modern: flat roofs with parapets and plain cream walls with regular windows.
+7. Finish it as true pixel art at the pixel density of Images 2 to 4: every edge sits on a hard pixel grid, with clean flat colour areas, crisp one-pixel dark outlines and no blur, soft gradients or painterly smudges anywhere.
+8. Repaint every ground surface cleanly instead of copying Image 1's blurry ground texture: the big courtyard as pale sandstone paving with a fine pixel grid and lighter paths crossing it, roads as flat grey asphalt with crisp kerbs and lane markings, the lawns south of the Quad as flat green with neat mown stripes, and the planted islands as flat green with crisp edges.
+9. Where Image 1 shows little detail, keep the drawing just as plain. The campus is quiet and empty: open paths and lawns, no people, no vehicles, no signs and no lettering anywhere.
