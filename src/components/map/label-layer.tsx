@@ -213,8 +213,18 @@ const MapLabel = memo(function MapLabel({
       )}
       style={{ fontSize: size }}
     >
-      {area ? (
-        <span className="px-1 py-0.5 italic tracking-wide [text-shadow:0_0_2px_#f6eedd,0_0_3px_#f6eedd,0_0_6px_#f6eedd]">{place.name}</span>
+      {place.kind === "complex" ? (
+        <span
+          className={cn(
+            "flex items-center gap-1.5 rounded-[3px] border border-[#201e1c]/25 bg-[#f1e8d2] px-1.5 py-[3px] font-semibold text-[#201e1c] shadow-[0_2px_0_rgba(0,0,0,0.22)]",
+            active && "outline-2 outline-[#e9c46a]",
+          )}
+        >
+          <span aria-hidden className="h-[0.95em] w-[3px] rounded-[1px]" style={{ background: meta.color }} />
+          {place.name}
+        </span>
+      ) : area ? (
+        <span className="px-1 py-0.5 font-semibold italic tracking-wide [text-shadow:0_0_2px_#f6eedd,0_0_2px_#f6eedd,0_0_4px_#f6eedd,0_0_8px_#f6eedd]">{place.name}</span>
       ) : (
         <span
           className={cn(

@@ -7,10 +7,10 @@
     "build": "next build",
     "start": "next start -p 4317",
     "lint": "eslint",
-    "map:fetch": "cd pipeline && uv run python -m stanford_pixxel.fetch_osm && uv run python -m stanford_pixxel.fetch_stanford && uv run python -m stanford_pixxel.fetch_lidar && uv run python -m stanford_pixxel.fetch_naip",
+    "map:fetch": "cd pipeline && uv run python -m stanford_pixxel.fetch_osm && uv run python -m stanford_pixxel.fetch_stanford && uv run python -m stanford_pixxel.fetch_lidar && uv run python -m stanford_pixxel.fetch_naip && mkdir -p ../data/raw/gtfs && curl -sL https://transportation-forms.stanford.edu/google/google_transit.zip -o ../data/raw/gtfs/gtfs.zip && cd ../data/raw/gtfs && unzip -o -q gtfs.zip",
     "map:scene": "cd pipeline && uv run python -m stanford_pixxel.build_scene && uv run python -m stanford_pixxel.network",
-    "map:bundle": "esbuild render/src/main.js --bundle --format=esm --outfile=render/dist/bundle.js --log-level=warning",
-    "map:render": "npm run map:bundle && node render/capture.mjs && cd pipeline && uv run python -m stanford_pixxel.compose",
+    "map:bundle": "esbuild render/src/main.js --bundle --format=esm --outfile=render/dist/bundle.js --log-level=warning && esbuild render/src/sprites.js --bundle --format=esm --outfile=render/dist/sprites.js --log-level=warning",
+    "map:render": "npm run map:bundle && node render/capture.mjs && node render/sprites.mjs && cd pipeline && uv run python -m stanford_pixxel.compose",
     "map:build": "npm run map:scene && npm run map:render"
   },
   "dependencies": {

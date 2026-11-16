@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
   Bike,
   Bus,
@@ -56,6 +56,13 @@ const PRESETS: { id: ScenePreset; label: string }[] = [
   { id: "night", label: "Late night" },
 ];
 
+const NARROW = "(max-width: 639px)";
+function subscribeNarrow(cb: () => void) {
+  const mq = window.matchMedia(NARROW);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+}
+
 const chrome = "border border-[#f1e8d2]/14 bg-[#201e1c]/94 text-[#f1e8d2] shadow-[0_8px_24px_rgba(10,9,8,0.32),0_1px_3px_rgba(10,9,8,0.38)] backdrop-blur";
 
 export function CampusApp({ tilesUrl, camera }: { tilesUrl: string; camera: CampusCamera }) {
@@ -66,7 +73,12 @@ export function CampusApp({ tilesUrl, camera }: { tilesUrl: string; camera: Camp
   const [visible, setVisible] = useState<Set<Category>>(() => new Set(DEFAULT_VISIBLE));
   const [showLabels, setShowLabels] = useState(true);
   const [live, setLive] = useState(true);
-  const [preset, setPresetState] = useState<ScenePreset>("live");
+  // The replay preset only affects what's drawn after mount, so reading the URL here can't cause a hydration mismatch.
+  const [preset, setPresetState] = useState<ScenePreset>(() => {
+    if (typeof window === "undefined") return "live";
+    const t = new URLSearchParams(window.location.search).get("time");
+    return PRESETS.some((p) => p.id === t) ? (t as ScenePreset) : "live";
+  });
   const setPreset = useCallback((p: ScenePreset) => {
     setPresetState(p);
     const url = new URL(window.location.href);
@@ -74,10 +86,7 @@ export function CampusApp({ tilesUrl, camera }: { tilesUrl: string; camera: Camp
     else url.searchParams.set("time", p);
     history.replaceState(null, "", url);
   }, []);
-  useEffect(() => {
-    const t = new URLSearchParams(window.location.search).get("time");
-    if (t && PRESETS.some((p) => p.id === t)) setPresetState(t as ScenePreset);
-  }, []);
+
   const [world, setWorld] = useState<LiveWorld | null>(null);
   const [stats, setStats] = useState<LiveStats | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -86,14 +95,7 @@ export function CampusApp({ tilesUrl, camera }: { tilesUrl: string; camera: Camp
   const [about, setAbout] = useState(false);
   const [focus, setFocus] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
-  const [narrow, setNarrow] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 639px)");
-    const on = () => setNarrow(mq.matches);
-    on();
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, []);
+  const narrow = useSyncExternalStore(subscribeNarrow, () => window.matchMedia(NARROW).matches, () => false);
   const mapRef = useRef<CampusMapHandle>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const placesRef = useRef<Place[]>([]);
@@ -268,7 +270,7 @@ export function CampusApp({ tilesUrl, camera }: { tilesUrl: string; camera: Camp
 
   return (
     <TooltipProvider delay={250}>
-      <main className="relative h-dvh w-full overflow-hidden bg-[#cfc9bc] text-[#201e1c]">
+      <main className="relative h-dvh w-full overflow-hidden bg-[#efe7d6] text-[#201e1c]">
         <CampusMap
           ref={mapRef}
           tilesUrl={tilesUrl}
