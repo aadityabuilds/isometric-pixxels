@@ -3,17 +3,28 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 4317",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "next start -p 4317",
+    "lint": "eslint",
+    "map:fetch": "cd pipeline && uv run python -m stanford_pixxel.fetch_osm && uv run python -m stanford_pixxel.fetch_stanford && uv run python -m stanford_pixxel.fetch_lidar && uv run python -m stanford_pixxel.fetch_naip",
+    "map:scene": "cd pipeline && uv run python -m stanford_pixxel.build_scene",
+    "map:bundle": "esbuild render/src/main.js --bundle --format=esm --outfile=render/dist/bundle.js --log-level=warning",
+    "map:render": "npm run map:bundle && node render/capture.mjs && cd pipeline && uv run python -m stanford_pixxel.compose",
+    "map:build": "npm run map:scene && npm run map:render"
   },
   "dependencies": {
+    "@base-ui/react": "^1.9.0",
+    "class-variance-authority": "^0.7.1",
+    "cn": "^0.5.2",
+    "lucide-react": "^1.73.0",
     "next": "16.4.6",
     "openseadragon": "^6.1.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "three": "^0.187.0"
+    "shadcn": "^4.23.0",
+    "three": "^0.187.0",
+    "tw-animate-css": "^1.4.0"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "4.3.3",

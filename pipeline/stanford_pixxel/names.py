@@ -95,6 +95,8 @@ def title_word(w: str, first: bool) -> str:
     if "'" in lw:
         head, _, tail = lw.partition("'")
         return head.capitalize() + "'" + (tail if len(tail) <= 2 else tail.capitalize())
+    if "/" in lw and len(lw) > 1:
+        return "/".join(title_word(p, True) for p in w.split("/"))
     if "-" in lw and len(lw) > 1:
         return "-".join(title_word(p, True) for p in w.split("-"))
     if lw.startswith("(") and len(lw) > 1:
@@ -117,9 +119,14 @@ DISPLAY_OVERRIDES = {
 }
 
 
+WORD_OVERRIDES = {"NG": "Ng House", "CASTANO": "Castaño", "HAMMARSKJOLD": "Hammarskjöld"}
+
+
 def pretty(name: str) -> str:
     if name in DISPLAY_OVERRIDES:
         return DISPLAY_OVERRIDES[name]
+    if name.strip() in WORD_OVERRIDES:
+        return WORD_OVERRIDES[name.strip()]
     name = re.sub(r"\s+", " ", name.strip())
     name = re.sub(r"\bBLDG\b\.?", "Building", name)
     words = name.split(" ")
@@ -147,7 +154,11 @@ def split_complex(raw: str):
 
 
 def skip_label(raw: str) -> bool:
-    return raw in ("", "NA", "N/A") or any(w in raw for w in SKIP_LABEL_WORDS)
+    return (
+        raw in ("", "NA", "N/A")
+        or any(w in raw for w in SKIP_LABEL_WORDS)
+        or bool(re.search(r"[,-] (KITCHEN|ADMINISTRATIVE WING|ADMINISTRATION)$", raw))
+    )
 
 
 def categorize(raw: str, group: str | None, osm_tags: dict) -> str:
@@ -186,3 +197,18 @@ def categorize(raw: str, group: str | None, osm_tags: dict) -> str:
     if any(w in u for w in RESIDENCE_WORDS):
         return "residence"
     return "academic"
+
+
+MINOR_PATTERNS = [
+    re.compile(r"^(I|II|III|IV|V|VI|VII|VIII)\s*-\s*UNIT", re.I),
+    re.compile(r"^BUILDING \d+$", re.I),
+    re.compile(r"^STUDIO \d+$", re.I),
+    re.compile(r"^\d+ [A-Z' ]+ - RESIDENCE$", re.I),
+    re.compile(r"LOUNGE$", re.I),
+    re.compile(r"^GUEST COTTAGES", re.I),
+    re.compile(r"ADMINISTRATION$", re.I),
+]
+
+
+def is_minor(display: str) -> bool:
+    return any(p.search(display) for p in MINOR_PATTERNS)

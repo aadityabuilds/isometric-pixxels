@@ -14,6 +14,13 @@ from .config import CAMERA_BEARING, CAMERA_ELEVATION, CENTER_UTM, LOCAL_CRS, PX_
 _to_local = Transformer.from_crs("EPSG:4326", LOCAL_CRS, always_xy=True)
 
 
+_to_ll = Transformer.from_crs(LOCAL_CRS, "EPSG:4326", always_xy=True)
+
+
+def local_to_lonlat(x, y):
+    return _to_ll.transform(x + CENTER_UTM[0], y + CENTER_UTM[1])
+
+
 def lonlat_to_local(lon, lat):
     x, y = _to_local.transform(lon, lat)
     return x - CENTER_UTM[0], y - CENTER_UTM[1]

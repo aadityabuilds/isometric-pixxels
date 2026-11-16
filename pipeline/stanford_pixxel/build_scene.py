@@ -27,7 +27,7 @@ from shapely.prepared import prep
 
 from . import names as N
 from .config import BUILD, CENTER_UTM, PUBLIC, RAW, region_polygon_local
-from .geo import Camera, element_polygon, load_osm, lonlat_to_local, polygons_of, way_line
+from .geo import Camera, element_polygon, load_osm, local_to_lonlat, lonlat_to_local, polygons_of, way_line
 
 Image.MAX_IMAGE_PIXELS = None
 rng = np.random.default_rng(7)
@@ -570,8 +570,7 @@ def landcover_image(grid: Grid, label):
     drift = ndimage.gaussian_filter(rng.standard_normal(r.shape).astype(np.float32), 18) * 9
     img = img * (1 + detail[..., None]) + drift[..., None]
     img = np.clip(img, 0, 255).astype(np.uint8)
-    im = Image.fromarray(img).resize((grid.W, grid.H), Image.NEAREST)
-    return im.filter(ImageFilter.SMOOTH)
+    return Image.fromarray(img).resize((grid.W, grid.H), Image.NEAREST)
 
 
 def paint_ground(cam: Camera, grid: Grid, elements, region, label):
@@ -599,7 +598,8 @@ def paint_ground(cam: Camera, grid: Grid, elements, region, label):
         return (A[0, 0], A[0, 1], off[0], A[1, 0], A[1, 1], off[1])
 
     canvas = Image.new("RGB", (W, H), (239, 231, 214))
-    ground = ground_src.transform((W, H), Image.AFFINE, inverse(res), resample=Image.BILINEAR)
+    ground = ground_src.transform((W, H), Image.AFFINE, inverse(res), resample=Image.NEAREST)
+    ground = ground.filter(ImageFilter.ModeFilter(3))
     shadow_img = sh.resize((sh.width * 2, sh.height * 2), Image.BILINEAR).transform((W, H), Image.AFFINE, inverse(res), resample=Image.BILINEAR)
 
     mask = Image.new("L", (W, H), 0)
@@ -966,6 +966,8 @@ def main():
             sx, sy = cam.screen(lp.x, lp.y, top)
             outline = [[round(v, 1) for v in cam.screen(x, y, group_base[b["group"]])] for x, y in gp.simplify(0.8).exterior.coords]
             rank = N.LANDMARKS.get(raw, 0)
+            if not rank and N.is_minor(short):
+                rank = 1
             if not rank:
                 rank = 3 if b["category"] in ("residence",) else 2
                 if gp.area > 2500:
@@ -983,7 +985,8 @@ def main():
                 "outline": outline,
                 "official": N.pretty(raw) if raw else None,
                 "bldgId": off["id"] if off else None,
-                "height": round(b["h"], 1),
+                "height": round(top, 1),
+                "lonlat": [round(v, 6) for v in local_to_lonlat(lp.x, lp.y)],
             })
             if group:
                 groups[group].append((lp.x, lp.y, b["h"], b["category"]))
@@ -1030,6 +1033,15 @@ def main():
             sx, sy = cam.screen(x, y, h)
             places.append({"name": row["NAME"], "category": cat, "x": round(sx, 1), "y": round(sy, 1), "rank": 3 if cat == "library" else 2, "kind": "poi"})
 
+    # Places without a footprint get coordinates by inverting the camera at ground level.
+    a, b_, c_, d_, tx, ty = cam.affine_ground()
+    Mi = np.linalg.inv(np.array([[a, b_], [c_, d_]]))
+    for pl in places:
+        if "lonlat" not in pl:
+            h = pl.get("height", 0) or 0
+            e, n = Mi @ np.array([pl["x"] - tx, pl["y"] - ty + cam.k * cam.cos_e * h])
+            pl["lonlat"] = [round(v, 6) for v in local_to_lonlat(float(e), float(n))]
+
     # De-duplicate labels with the same name near each other.
     seen = {}
     deduped = []
@@ -1040,6 +1052,11 @@ def main():
             continue
         seen[key] = pl
         deduped.append(pl)
+    ids = defaultdict(int)
+    for pl in deduped:
+        base = re.sub(r"[^a-z0-9]+", "-", pl["name"].lower()).strip("-") or "place"
+        ids[base] += 1
+        pl["id"] = base if ids[base] == 1 else f"{base}-{ids[base]}"
 
     palm_lines = []
     for el in elements:
