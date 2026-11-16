@@ -122,32 +122,6 @@
   },
   {
    "x": 5376,
-   "y": 896,
-   "file": "5376_896.png",
-   "photos": [
-    "Lagunita Court - panoramio.jpg",
-    "Eucalypto Lounge at Lagunita Court - panoramio.jpg",
-    "Roble Gym Stanford April 2013 001.jpg"
-   ],
-   "buildings": [
-    "Governor's Corner",
-    "Lagunita Court",
-    "Huang Engineering Center",
-    "Durand Building",
-    "Suites Field",
-    "Roble Field",
-    "Griffin (Governor's Corner)",
-    "Y2E2",
-    "Deep Lab",
-    "Arrillaga Outdoor Ed. and Rec. CNTR",
-    "Meier Hall (Lagunita Court)",
-    "Norcliffe (Lagunita Court)",
-    "Ujamaa A (Lagunita Court)",
-    "Eucalipto (Lagunita Court)"
-   ]
-  },
-  {
-   "x": 5376,
    "y": 2688,
    "file": "5376_2688.png",
    "photos": [
@@ -344,32 +318,6 @@
   },
   {
    "x": 4480,
-   "y": 896,
-   "file": "4480_896.png",
-   "photos": [
-    "Lake Lagunita Stanford May 2011 001.jpg",
-    "Lake Lagunita Stanford May 2011 002.jpg",
-    "Lake Lagunita Stanford May 2011 003.jpg"
-   ],
-   "buildings": [
-    "Lake Lagunita",
-    "Tresidder Memorial Union",
-    "Roble Hall",
-    "Papua New Guinea Sculpture Garden",
-    "Denning House",
-    "Meier Hall (Lagunita Court)",
-    "Ujamaa A (Lagunita Court)",
-    "Harmony House",
-    "Rogers",
-    "Windhover",
-    "Ujamaa B (Lagunita Court)",
-    "Mechanical Engineering Laboratory",
-    "Press",
-    "408 Panama Mall"
-   ]
-  },
-  {
-   "x": 4480,
    "y": 3584,
    "file": "4480_3584.png",
    "photos": [
@@ -389,54 +337,6 @@
     "Palo Alto Unified School District",
     "Sunken Diamond Batting Cage",
     "Baseball Pressbox"
-   ]
-  },
-  {
-   "x": 3584,
-   "y": 896,
-   "file": "3584_896.png",
-   "photos": [
-    "Medical supplies to Ukraine flyer in Stanford.jpg",
-    "Stanford Bechtel International Center with Ukrainian flag.jpg",
-    "Stanford University, Inside the Center for Computer Research in Music and Acoustics, May 28, 2023 - 65.jpg"
-   ],
-   "buildings": [
-    "Florence Moore Hall",
-    "Levin Field",
-    "Narnia",
-    "680 Lomita DR",
-    "Kappa Alpha",
-    "Enchanted Broccoli Forest",
-    "Jerry",
-    "Lake House",
-    "Mariposa",
-    "Rogers",
-    "Attneave",
-    "Storey",
-    "Xanadu"
-   ]
-  },
-  {
-   "x": 5376,
-   "y": 0,
-   "file": "5376_0.png",
-   "photos": [
-    "USA-Stanford-Development of Motion Pictures.JPG",
-    "Stanford Links Road.jpg",
-    "Red Barn left.JPG"
-   ],
-   "buildings": [
-    "Governor's Corner",
-    "Lyman Graduate Residences",
-    "Lyman",
-    "Suites Field",
-    "Griffin (Governor's Corner)",
-    "Jenkins (Governor's Corner)",
-    "Adams (Governor's Corner)",
-    "Ricker Dining Center (Governor's Corner)",
-    "Marx (Governor's Corner)",
-    "Anderson (Governor's Corner)",
-    "Potter (Governor's Corner)"
    ]
   },
   {
@@ -827,17 +727,6 @@
    "buildings": []
   },
   {
-   "x": 4480,
-   "y": 0,
-   "file": "4480_0.png",
-   "photos": [
-    "Lake Lagunita Stanford February 2013 003.jpg",
-    "Lake Lagunita Stanford February 2013 004.jpg",
-    "Stanford Links Road.jpg"
-   ],
-   "buildings": []
-  },
-  {
    "x": 0,
    "y": 2688,
    "file": "0_2688.png",
@@ -872,6 +761,123 @@
     "Donaldina M. Cameron Park.jpg"
    ],
    "buildings": []
+  },
+  {
+   "x": 4480,
+   "y": 896,
+   "file": "4480_896.png",
+   "photos": [
+    "Lake Lagunita Stanford May 2011 001.jpg",
+    "Lake Lagunita Stanford May 2011 002.jpg",
+    "Lake Lagunita Stanford May 2011 003.jpg"
+   ],
+   "buildings": [
+    "Lagunita Court",
+    "Lake Lagunita",
+    "Tresidder Memorial Union",
+    "Roble Hall",
+    "Papua New Guinea Sculpture Garden",
+    "Denning House",
+    "Meier Hall (Lagunita Court)",
+    "Ujamaa A (Lagunita Court)",
+    "Harmony House",
+    "Mariposa",
+    "Rogers",
+    "Windhover",
+    "Ujamaa B (Lagunita Court)",
+    "Naranja (Lagunita Court)"
+   ]
+  },
+  {
+   "x": 5376,
+   "y": 896,
+   "file": "5376_896.png",
+   "photos": [
+    "Lagunita Court - panoramio.jpg",
+    "Eucalypto Lounge at Lagunita Court - panoramio.jpg",
+    "Roble Gym Stanford April 2013 001.jpg"
+   ],
+   "buildings": [
+    "Governor's Corner",
+    "Lagunita Court",
+    "Lake Lagunita",
+    "Huang Engineering Center",
+    "Lyman",
+    "Durand Building",
+    "Suites Field",
+    "Roble Field",
+    "Griffin (Governor's Corner)",
+    "Y2E2",
+    "Deep Lab",
+    "Via Ortega Garage",
+    "Arrillaga Outdoor Ed. and Rec. CNTR",
+    "Meier Hall (Lagunita Court)"
+   ]
+  },
+  {
+   "x": 5376,
+   "y": 0,
+   "file": "5376_0.png",
+   "photos": [
+    "USA-Stanford-Development of Motion Pictures.JPG",
+    "Stanford Links Road.jpg",
+    "Red Barn left.JPG"
+   ],
+   "buildings": [
+    "Governor's Corner",
+    "Lake Lagunita",
+    "Lyman Graduate Residences",
+    "Lyman",
+    "Suites Field",
+    "Griffin (Governor's Corner)",
+    "Jenkins (Governor's Corner)",
+    "Schiff (Governor's Corner)",
+    "Adams (Governor's Corner)",
+    "Ricker Dining Center (Governor's Corner)",
+    "Marx (Governor's Corner)",
+    "Anderson (Governor's Corner)",
+    "Potter (Governor's Corner)",
+    "Robinson (Governor's Corner)"
+   ]
+  },
+  {
+   "x": 4480,
+   "y": 0,
+   "file": "4480_0.png",
+   "photos": [
+    "Lake Lagunita Stanford February 2013 003.jpg",
+    "Lake Lagunita Stanford February 2013 004.jpg",
+    "Stanford Links Road.jpg"
+   ],
+   "buildings": [
+    "Lake Lagunita"
+   ]
+  },
+  {
+   "x": 3584,
+   "y": 896,
+   "file": "3584_896.png",
+   "photos": [
+    "Stanford University, Inside the Center for Computer Research in Music and Acoustics, May 28, 2023 - 65.jpg",
+    "Stanford University, Inside the Center for Computer Research in Music and Acoustics, May 28, 2023 - 66.jpg",
+    "Stanford University, Near the Center for Computer Research in Music and Acoustics, May 28, 2023 - 64.jpg"
+   ],
+   "buildings": [
+    "Florence Moore Hall",
+    "Lake Lagunita",
+    "Tresidder Memorial Union",
+    "Levin Field",
+    "Narnia",
+    "675 Lomita",
+    "680 Lomita DR",
+    "Braun Music Center",
+    "Kappa Alpha",
+    "Enchanted Broccoli Forest",
+    "Jerry",
+    "Lake House",
+    "Robert Moore South",
+    "Mariposa"
+   ]
   }
  ]
 }

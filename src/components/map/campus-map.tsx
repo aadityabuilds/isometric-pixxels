@@ -141,7 +141,14 @@ export function CampusMap(props: Props) {
       };
       viewer.addHandler("open", () => {
         if (tilesAiUrl && viewer.world.getItemCount() === 1) {
-          viewer.addTiledImage({ tileSource: tilesAiUrl, opacity: showAiRef.current ? 1 : 0, index: 1 });
+          viewer.addTiledImage({
+            tileSource: tilesAiUrl,
+            opacity: showAiRef.current ? 1 : 0,
+            index: 1,
+            success: () => {
+              base()?.setOpacity(showAiRef.current ? 0 : 1);
+            },
+          });
         }
         if (viewer.container.clientWidth < 640) {
           const vp = viewer.viewport;
@@ -194,8 +201,9 @@ export function CampusMap(props: Props) {
 
   useEffect(() => {
     showAiRef.current = showAi;
-    const item = viewerRef.current?.world.getItemAt(1);
-    item?.setOpacity(showAi ? 1 : 0);
+    const world = viewerRef.current?.world;
+    world?.getItemAt(1)?.setOpacity(showAi ? 1 : 0);
+    world?.getItemAt(0)?.setOpacity(showAi ? 0 : 1);
   }, [showAi]);
 
   useImperativeHandle(
