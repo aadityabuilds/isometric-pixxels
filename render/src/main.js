@@ -11,10 +11,14 @@ const FLOOR = 3.6;
 
 let scene, renderer, cam, sun, target, post;
 
+function lit(normal, ambient, diffuse) {
+  const d = Math.max(0, normal[0] * sun[0] + normal[1] * sun[1] + normal[2] * sun[2]);
+  return ambient + diffuse * d;
+}
+
 function shade(hex, normal, ambient = 0.6, diffuse = 0.48) {
   const c = new THREE.Color(hex);
-  const d = Math.max(0, normal[0] * sun[0] + normal[1] * sun[1] + normal[2] * sun[2]);
-  const k = ambient + diffuse * d;
+  const k = lit(normal, ambient, diffuse);
   return [Math.min(1, c.r * k), Math.min(1, c.g * k), Math.min(1, c.b * k)];
 }
 
@@ -55,13 +59,13 @@ function faceNormal(a, b, c) {
 }
 
 function windowStyle(b, wallH) {
-  if (wallH < 2.8) return 0;
+  if (wallH < 2.8 || b.stands) return 0;
   if (b.category === "parking") return 2;
   if (b.category === "residence" && wallH < 9) return 3;
   return 1;
 }
 
-function addWalls(mesh, b, ring, z0, z1, viewDir) {
+function addWalls(mesh, b, ring, z0, z1, viewDir, allSides = false) {
   const style = windowStyle(b, z1 - z0);
   let s = 0;
   for (let i = 0; i < ring.length - 1; i++) {
@@ -74,7 +78,7 @@ function addWalls(mesh, b, ring, z0, z1, viewDir) {
     const n = [dy / len, -dx / len, 0];
     const s0 = s;
     s += len;
-    if (n[0] * viewDir[0] + n[1] * viewDir[1] < -0.02) continue;
+    if (!allSides && n[0] * viewDir[0] + n[1] * viewDir[1] < -0.02) continue;
     const color = shade(b.wallColor, n, 0.58, 0.5);
     const info = [style, z1];
     const p00 = [a[0], a[1], z0];
@@ -97,8 +101,9 @@ function addFlatRoof(mesh, b, rings, z, color) {
   }
   const all = outer.concat(...holes);
   const col = shade(color, [0, 0, 1], 0.62, 0.42);
+  const k0 = lit([0, 0, 1], 0.62, 0.42);
   for (const [i, j, k] of tris) {
-    mesh.tri([all[i].x, all[i].y, z], [all[j].x, all[j].y, z], [all[k].x, all[k].y, z], col, null, [5, z]);
+    mesh.tri([all[i].x, all[i].y, z], [all[j].x, all[j].y, z], [all[k].x, all[k].y, z], col, null, [5, k0]);
   }
 }
 
@@ -132,15 +137,58 @@ function addPolygon3d(mesh, poly, z, color, info) {
     const b = [poly[j][0], poly[j][1], z(poly[j])];
     const c = [poly[k][0], poly[k][1], z(poly[k])];
     const n = faceNormal(a, b, c);
-    mesh.tri(a, b, c, shade(color, n, 0.56, 0.55), null, info);
+    mesh.tri(a, b, c, shade(color, n, 0.56, 0.55), null, [info[0], lit(n, 0.56, 0.55)]);
   }
 }
 
+function cleanRing(ring, wantCcw) {
+  const pts = [];
+  for (const p of ring.slice(0, -1)) {
+    const last = pts[pts.length - 1];
+    if (!last || Math.hypot(p[0] - last[0], p[1] - last[1]) > 0.05) pts.push(p);
+  }
+  // Drop nearly collinear vertices; CGAL rejects degenerate rings.
+  let changed = true;
+  while (changed && pts.length > 3) {
+    changed = false;
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[(i + pts.length - 1) % pts.length];
+      const b = pts[i];
+      const c = pts[(i + 1) % pts.length];
+      const cross = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+      if (Math.abs(cross) < 0.02) {
+        pts.splice(i, 1);
+        changed = true;
+        break;
+      }
+    }
+  }
+  if (pts.length < 3) return null;
+  let area = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    area += a[0] * b[1] - b[0] * a[1];
+  }
+  if (Math.abs(area) < 4) return null;
+  if (area > 0 !== wantCcw) pts.reverse();
+  pts.push(pts[0]);
+  return pts;
+}
+
+let skeletonBroken = false;
+
 function addHippedRoof(mesh, b, rings) {
+  if (skeletonBroken) return false;
+  const outer = cleanRing(rings[0], true);
+  if (!outer) return false;
+  const holes = rings.slice(1).map((r) => cleanRing(r, false)).filter(Boolean);
   let sk = null;
   try {
-    sk = SkeletonBuilder.buildFromPolygon(rings);
+    sk = SkeletonBuilder.buildFromPolygon([outer, ...holes]);
   } catch {
+    // A CGAL assertion aborts the WebAssembly module; the caller re-initialises it.
+    skeletonBroken = true;
     sk = null;
   }
   if (!sk) return false;
@@ -156,6 +204,39 @@ function addHippedRoof(mesh, b, rings) {
       addPolygon3d(mesh, flat, z, b.roofColor, [5, b.eave + b.rise]);
     }
   }
+  return true;
+}
+
+function addBowlRoof(mesh, b, rings) {
+  // Stadium stands: seating rises from the field (the inner ring) to a flat rim along the outside.
+  const outer = cleanRing(rings[0], true);
+  const holes = rings.slice(1).map((r) => cleanRing(r, false)).filter(Boolean);
+  if (!outer || !holes.length || skeletonBroken) return false;
+  let sk = null;
+  try {
+    sk = SkeletonBuilder.buildFromPolygon([outer, ...holes]);
+  } catch {
+    skeletonBroken = true;
+  }
+  if (!sk) return false;
+  const holeKeys = new Set(holes.flat().map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`));
+  const top = b.eave + b.rise;
+  for (const face of sk.polygons) {
+    const poly = face.map((i) => sk.vertices[i]);
+    const base = poly.filter((p) => p[2] < 1e-6);
+    const fromField = base.length > 0 && base.every((p) => holeKeys.has(`${p[0].toFixed(1)},${p[1].toFixed(1)}`));
+    const tcap = b.rise / b.pitch;
+    if (fromField) {
+      const z = (p) => b.eave + Math.min(p[2], tcap) * b.pitch;
+      addPolygon3d(mesh, clipPolygon(poly, tcap, true), z, b.roofColor, [6, 0]);
+      const above = clipPolygon(poly, tcap, false);
+      if (above.length >= 3) addPolygon3d(mesh, above, () => top, "#b9b4aa", [5, 0]);
+    } else {
+      addPolygon3d(mesh, poly, () => top, "#b9b4aa", [5, 0]);
+    }
+  }
+  // The field side of the stands: a low wall from the ground up to the first row.
+  for (const ring of holes) addWalls(mesh, { ...b, wallColor: "#8f8a80" }, ring, 0, b.eave, [0, 0], true);
   return true;
 }
 
@@ -185,18 +266,28 @@ function addDome(mesh, b, rings) {
       const c = pt(i + 1, j);
       const d = pt(i + 1, j + 1);
       const e = pt(i, j + 1);
-      mesh.tri(a, c, d, shade(b.roofColor, faceNormal(a, c, d), 0.55, 0.6), null, [6, 0]);
-      mesh.tri(a, d, e, shade(b.roofColor, faceNormal(a, d, e), 0.55, 0.6), null, [6, 0]);
+      mesh.tri(a, c, d, shade(b.roofColor, faceNormal(a, c, d), 0.55, 0.6), null, [7, lit(faceNormal(a, c, d), 0.55, 0.6)]);
+      mesh.tri(a, d, e, shade(b.roofColor, faceNormal(a, d, e), 0.55, 0.6), null, [7, lit(faceNormal(a, d, e), 0.55, 0.6)]);
     }
   }
 }
 
-function buildBuildings(data, viewDir) {
+async function buildBuildings(data, viewDir) {
   const mesh = new Mesh();
   for (const b of data.buildings) {
+    if (skeletonBroken) {
+      skeletonBroken = false;
+      SkeletonBuilder.module = null;
+      await SkeletonBuilder.init();
+    }
     const rings = b.rings;
     const z0 = b.minH || 0;
-    const wallTop = b.roof === "flat" ? b.h : b.eave;
+    const wallTop = b.roof === "flat" ? b.h : b.roof === "bowl" ? b.eave + b.rise : b.eave;
+    if (b.roof === "bowl") {
+      addWalls(mesh, b, rings[0], z0, wallTop, viewDir);
+      if (!addBowlRoof(mesh, b, rings)) addFlatRoof(mesh, b, rings, wallTop, b.roofColor);
+      continue;
+    }
     for (const ring of rings) addWalls(mesh, b, ring, z0, wallTop, viewDir);
     if (b.roof === "hipped") {
       if (!addHippedRoof(mesh, b, rings)) addFlatRoof(mesh, b, rings, b.h, b.roofColor);
@@ -210,11 +301,14 @@ function buildBuildings(data, viewDir) {
   return mesh.build();
 }
 
-const buildingMaterial = () =>
+const buildingMaterial = (roofTex, rt) =>
   new THREE.ShaderMaterial({
     side: THREE.DoubleSide,
     vertexColors: true,
-    uniforms: {},
+    uniforms: {
+      tRoof: { value: roofTex },
+      roofBox: { value: new THREE.Vector4(rt.x0, rt.y1, rt.w * rt.res, rt.h * rt.res) },
+    },
     vertexShader: /* glsl */ `
       attribute vec2 info;
       attribute vec2 wuv;
@@ -230,6 +324,8 @@ const buildingMaterial = () =>
         gl_Position = projectionMatrix * vec4(position, 1.0);
       }`,
     fragmentShader: /* glsl */ `
+      uniform sampler2D tRoof;
+      uniform vec4 roofBox;
       varying vec3 vColor;
       varying vec2 vUv;
       varying vec2 vInfo;
@@ -237,6 +333,12 @@ const buildingMaterial = () =>
       void main() {
         vec3 c = vColor;
         float style = vInfo.x;
+        if (style > 4.5 && style < 6.5) {
+          // Rooftops show the real aerial photo, lit like the rest of the roof.
+          vec2 ruv = vec2((vPos.x - roofBox.x) / roofBox.z, (roofBox.y - vPos.y) / roofBox.w);
+          vec3 photo = texture2D(tRoof, ruv).rgb;
+          c = mix(vColor, photo * vInfo.y * 1.06, 0.72);
+        }
         if (vUv.x >= 0.0 && style > 0.5 && style < 4.5) {
           float z = vUv.y;
           float top = vInfo.y;
@@ -253,9 +355,9 @@ const buildingMaterial = () =>
             if (inside && fl > 0.30 && fl < 0.72 && col2 > 0.30 && col2 < 0.62) c = mix(c, glass, 0.7);
           }
         }
-        if (style > 5.5) {
+        if (style > 5.5 && style < 6.5) {
           float tiles = fract(vPos.z / 0.55);
-          if (tiles < 0.22) c *= 0.86;
+          if (tiles < 0.22) c *= 0.88;
         }
         gl_FragColor = vec4(c, style > 4.5 ? 1.0 : 0.6);
       }`,
@@ -303,6 +405,12 @@ function treeGeometries() {
   return { crown, cone, trunk, frond };
 }
 
+function crownHeight(kind, h, r) {
+  if (kind === 3) return Math.min(h * 0.62, r * 3.2);
+  if (kind === 4) return Math.min(h * 0.6, r * 1.15);
+  return Math.min(h * 0.72, r * 1.9);
+}
+
 function buildTrees(data) {
   const geos = treeGeometries();
   const mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, opacity: 0.3 });
@@ -321,7 +429,7 @@ function buildTrees(data) {
   const palmTrunk = new THREE.Color("#a58a68");
   for (const list of chunks.values()) {
     const parts = {
-      crown: list.filter((t) => t[4] === 0),
+      crown: list.filter((t) => t[4] === 0 || t[4] >= 3),
       cone: list.filter((t) => t[4] === 1),
       frond: list.filter((t) => t[4] === 2),
     };
@@ -331,9 +439,10 @@ function buildTrees(data) {
       items.forEach((t, i) => {
         const [x, y, h, r, kind, color] = t;
         q.setFromAxisAngle(zAxis, ((x * 13.7 + y * 7.3) % 6.28));
-        if (kind === 0) {
-          const ch = Math.min(h * 0.72, r * 1.9);
-          m.compose(new THREE.Vector3(x, y, h - ch / 2), q, new THREE.Vector3(r, r, ch / 2));
+        if (kind === 0 || kind >= 3) {
+          const ch = crownHeight(kind, h, r);
+          const rr = kind === 3 ? r * 0.85 : r;
+          m.compose(new THREE.Vector3(x, y, h - ch / 2), q, new THREE.Vector3(rr, rr * (kind === 4 ? 0.92 : 1), ch / 2));
         } else if (kind === 1) {
           const ch = h * 0.85;
           m.compose(new THREE.Vector3(x, y, h - ch), q, new THREE.Vector3(r, r, ch));
@@ -349,7 +458,7 @@ function buildTrees(data) {
     const trunks = new THREE.InstancedMesh(geos.trunk, mat, list.length);
     list.forEach((t, i) => {
       const [x, y, h, r, kind] = t;
-      const th = kind === 0 ? h - Math.min(h * 0.72, r * 1.9) * 0.75 : kind === 1 ? h * 0.25 : h - 0.4;
+      const th = kind === 0 || kind >= 3 ? h - crownHeight(kind, h, r) * 0.75 : kind === 1 ? h * 0.25 : h - 0.4;
       const w = kind === 2 ? 0.75 : Math.min(1.3, 0.55 + h * 0.03);
       m.compose(new THREE.Vector3(x, y, 0), q.identity(), new THREE.Vector3(w, w, Math.max(th, 0.5)));
       trunks.setMatrixAt(i, m);
@@ -433,8 +542,14 @@ async function init() {
   const b = (data.camera.bearing * Math.PI) / 180;
   const viewDir = [-Math.sin(b), -Math.cos(b)];
   scene = new THREE.Scene();
-  const bg = buildBuildings(data, viewDir);
-  scene.add(new THREE.Mesh(bg, buildingMaterial()));
+  const bg = await buildBuildings(data, viewDir);
+  const roofTex = await new THREE.TextureLoader().loadAsync("/data/build/roofs.png");
+  roofTex.flipY = false;
+  roofTex.magFilter = THREE.NearestFilter;
+  roofTex.minFilter = THREE.NearestFilter;
+  roofTex.generateMipmaps = false;
+  roofTex.needsUpdate = true;
+  scene.add(new THREE.Mesh(bg, buildingMaterial(roofTex, data.roofTex)));
   scene.add(buildTrees(data));
   cam = new THREE.Camera();
   cam.matrixAutoUpdate = false;

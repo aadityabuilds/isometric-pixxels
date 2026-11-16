@@ -8,7 +8,7 @@
     "start": "next start -p 4317",
     "lint": "eslint",
     "map:fetch": "cd pipeline && uv run python -m stanford_pixxel.fetch_osm && uv run python -m stanford_pixxel.fetch_stanford && uv run python -m stanford_pixxel.fetch_lidar && uv run python -m stanford_pixxel.fetch_naip",
-    "map:scene": "cd pipeline && uv run python -m stanford_pixxel.build_scene",
+    "map:scene": "cd pipeline && uv run python -m stanford_pixxel.build_scene && uv run python -m stanford_pixxel.network",
     "map:bundle": "esbuild render/src/main.js --bundle --format=esm --outfile=render/dist/bundle.js --log-level=warning",
     "map:render": "npm run map:bundle && node render/capture.mjs && cd pipeline && uv run python -m stanford_pixxel.compose",
     "map:build": "npm run map:scene && npm run map:render"

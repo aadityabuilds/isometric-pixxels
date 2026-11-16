@@ -1,0 +1,194 @@
+[
+ {
+  "id": "palm-drive",
+  "title": "Palm Drive",
+  "blurb": "The palm-lined avenue from El Camino Real to the Oval, and most visitors' first view of campus.",
+  "image": "/places/palm-drive.webp"
+ },
+ {
+  "id": "the-oval",
+  "title": "The Oval",
+  "blurb": "The great lawn at the top of Palm Drive, framing the view of the Main Quad and Memorial Church.",
+  "image": "/places/the-oval.webp"
+ },
+ {
+  "id": "main-quad",
+  "title": "Main Quad",
+  "blurb": "The original heart of campus, opened in 1891: sandstone buildings and arcades with red tile roofs, laid out with Frederick Law Olmsted.",
+  "image": "/places/main-quad.webp"
+ },
+ {
+  "id": "memorial-church",
+  "title": "Memorial Church",
+  "blurb": "Built by Jane Stanford in memory of her husband Leland and dedicated in 1903. Its mosaic facade faces the inner Quad.",
+  "image": "/places/memorial-church.webp"
+ },
+ {
+  "id": "hoover-tower",
+  "title": "Hoover Tower",
+  "blurb": "The 285-foot tower finished in 1941 for Stanford's 50th anniversary, home to part of the Hoover Institution Library & Archives.",
+  "image": "/places/hoover-tower.webp"
+ },
+ {
+  "id": "green-library",
+  "title": "Green Library",
+  "blurb": "Cecil H. Green Library, Stanford's main humanities and social sciences library. The Bing Wing is the original 1919 library.",
+  "image": "/places/green-library.webp"
+ },
+ {
+  "id": "white-plaza",
+  "title": "White Plaza",
+  "blurb": "The student crossroads between Tresidder, Old Union and the Bookstore, with club tables and the Claw fountain.",
+  "image": "/places/white-plaza.webp"
+ },
+ {
+  "id": "tresidder-memorial-union",
+  "title": "Tresidder Union",
+  "blurb": "The student union: food, meeting rooms and services just off White Plaza.",
+  "image": "/places/tresidder-memorial-union.webp"
+ },
+ {
+  "id": "old-union",
+  "title": "Old Union",
+  "blurb": "Stanford's original student union, now home to student life offices and community centers.",
+  "image": "/places/old-union.webp"
+ },
+ {
+  "id": "cantor-arts-center",
+  "title": "Cantor Arts Center",
+  "blurb": "Stanford's art museum, opened in 1894 as the Leland Stanford Junior Museum.",
+  "image": "/places/cantor-arts-center.webp"
+ },
+ {
+  "id": "rodin-sculpture-garden",
+  "title": "Rodin Sculpture Garden",
+  "blurb": "An outdoor garden of bronzes by Auguste Rodin beside the Cantor, including The Gates of Hell.",
+  "image": "/places/rodin-sculpture-garden.webp"
+ },
+ {
+  "id": "anderson-collection-at-stanford-university",
+  "title": "Anderson Collection",
+  "blurb": "A museum of modern and contemporary American art next to the Cantor.",
+  "image": "/places/anderson-collection-at-stanford-university.webp"
+ },
+ {
+  "id": "bing-concert-hall",
+  "title": "Bing Concert Hall",
+  "blurb": "The concert hall opened in 2013, built around a vineyard-style auditorium.",
+  "image": "/places/bing-concert-hall.webp"
+ },
+ {
+  "id": "frost-amphitheater",
+  "title": "Frost Amphitheater",
+  "blurb": "An open-air concert bowl in the trees, dedicated in 1937.",
+  "image": "/places/frost-amphitheater.webp"
+ },
+ {
+  "id": "stanford-stadium",
+  "title": "Stanford Stadium",
+  "blurb": "Home of Stanford football, rebuilt in 2006 inside the bowl of the original 1921 stadium.",
+  "image": "/places/stanford-stadium.webp"
+ },
+ {
+  "id": "maples-pavilion",
+  "title": "Maples Pavilion",
+  "blurb": "Home of Stanford basketball and volleyball since 1969.",
+  "image": "/places/maples-pavilion.webp"
+ },
+ {
+  "id": "sunken-diamond",
+  "title": "Sunken Diamond",
+  "blurb": "Klein Field at Sunken Diamond, Stanford's baseball park.",
+  "image": "/places/sunken-diamond.webp"
+ },
+ {
+  "id": "engineering-quad",
+  "title": "Science & Engineering Quad",
+  "blurb": "The SEQ, ringed by Huang, Y2E2, Spilker and the Shriram Center.",
+  "image": "/places/engineering-quad.webp"
+ },
+ {
+  "id": "gates-computer-science",
+  "title": "Gates Computer Science",
+  "blurb": "Home of the Computer Science department since 1996.",
+  "image": "/places/gates-computer-science.webp"
+ },
+ {
+  "id": "stanford-law-school",
+  "title": "Stanford Law School",
+  "blurb": "The Law School's Crown Quadrangle, on the east side of the Main Quad.",
+  "image": "/places/stanford-law-school.webp"
+ },
+ {
+  "id": "lake-lagunita",
+  "title": "Lake Lagunita",
+  "blurb": "A seasonal lake: it fills in wet winters and dries to meadow the rest of the year.",
+  "image": "/places/lake-lagunita.webp"
+ },
+ {
+  "id": "roble-hall",
+  "title": "Roble Hall",
+  "blurb": "Opened in 1918 as a women's residence, now a co-ed dorm near Lake Lag.",
+  "image": "/places/roble-hall.webp"
+ },
+ {
+  "id": "florence-moore-hall",
+  "title": "Florence Moore Hall",
+  "blurb": "FloMo: seven student houses (Alondra, Cardenal, Faisan, Gavilan, Loro, Mirlo and Paloma) with their own dining hall.",
+  "image": "/places/florence-moore-hall.webp"
+ },
+ {
+  "id": "lagunita-court",
+  "title": "Lagunita Court",
+  "blurb": "Houses around a courtyard near the lake, including Adelfa, Eucalipto, Granada, Naranja, Meier, Norcliffe and Ujamaa.",
+  "image": "/places/lagunita-court.webp"
+ },
+ {
+  "id": "governor-s-corner",
+  "title": "Governor's Corner",
+  "blurb": "Suites and houses at the west edge of campus, including Robinson, Yost, Potter and Murray.",
+  "image": "/places/governor-s-corner.webp"
+ },
+ {
+  "id": "the-row",
+  "title": "The Row",
+  "blurb": "Mayfield Avenue and its neighbours, lined with student houses, co-ops and Greek houses.",
+  "image": "/places/the-row.webp"
+ },
+ {
+  "id": "wilbur-hall",
+  "title": "Wilbur Hall",
+  "blurb": "Eight houses, mostly for first-year students: Arroyo, Cedro, Junipero, Okada, Otero, Rinconada, Soto and Trancos.",
+  "image": "/places/wilbur-hall.webp"
+ },
+ {
+  "id": "stern-hall",
+  "title": "Stern Hall",
+  "blurb": "Six houses: Burbank, Donner, Larkin, Sally Ride, Twain and Casa Zapata.",
+  "image": "/places/stern-hall.webp"
+ },
+ {
+  "id": "branner-hall",
+  "title": "Branner Hall",
+  "blurb": "A large residence next to Toyon and Crothers.",
+  "image": "/places/branner-hall.webp"
+ },
+ {
+  "id": "gerhard-casper-quad",
+  "title": "Gerhard Casper Quad",
+  "blurb": "Kimball, Lantana, Castaño and Ng houses around a shared dining commons.",
+  "image": "/places/gerhard-casper-quad.webp"
+ },
+ {
+  "id": "escondido-village",
+  "title": "Escondido Village",
+  "blurb": "Graduate housing east of campus, from low-rise apartments to the EVGR towers opened in 2020.",
+  "image": "/places/escondido-village.webp"
+ },
+ {
+  "id": "stanford-hospital",
+  "title": "Stanford Hospital",
+  "blurb": "The medical center on the north edge of campus; the new hospital opened in 2019.",
+  "image": "/places/stanford-hospital.webp"
+ }
+]

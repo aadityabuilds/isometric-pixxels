@@ -132,6 +132,7 @@ def apply_osm_3d(b):
     minh = num(t.get("min_height")) or ((num(t.get("building:min_level")) or 0) * 3.5)
     b["h"] = h
     b["parts"] = []
+    b["render_polys"] = [b["poly"]]
     if minh:
         b["minH"] = minh
     if shape in ("hipped", "dome") and roof_h > 0.3:
@@ -194,6 +195,76 @@ def polygonize_mask(mask, transform, footprint, min_area):
     return out
 
 
+def kmeans_1d(z, k, iters=20):
+    c = np.percentile(z, np.linspace(10, 90, k))
+    for _ in range(iters):
+        lab = np.argmin(np.abs(z[:, None] - c[None, :]), axis=1)
+        for j in range(k):
+            if (lab == j).any():
+                c[j] = np.median(z[lab == j])
+    order = np.argsort(c)
+    remap = np.empty(k, int)
+    remap[order] = np.arange(k)
+    return remap[lab], c[order]
+
+
+def partition_by_height(b, cells, z, grid, slope):
+    """Split a footprint into height regions; returns (lowest_region_polygon, [parts]) or None."""
+    if b["poly"].area < 400 or len(cells) < 200 or np.percentile(z, 97) - np.percentile(z, 10) < 5:
+        return None
+    best = None
+    for k in (4, 3, 2):
+        lab, c = kmeans_1d(z, k)
+        shares = np.bincount(lab, minlength=k) / len(z)
+        if (np.diff(c) > 3.5).all() and (shares > 0.05).all():
+            best = (lab, c)
+            break
+    if best is None:
+        return None
+    lab, centers = best
+    rows, cols = np.unravel_index(cells, (grid.H, grid.W))
+    r0, r1, c0, c1 = rows.min(), rows.max() + 1, cols.min(), cols.max() + 1
+    tr = from_origin(grid.x0 + c0 * grid.res, grid.y1 - r0 * grid.res, grid.res, grid.res)
+    win_lab = np.full((r1 - r0, c1 - c0), -1, int)
+    win_lab[rows - r0, cols - c0] = lab
+    # Fill unobserved cells inside the footprint from their nearest neighbours so regions stay solid.
+    inside = rasterize([(b["poly"], 1)], out_shape=win_lab.shape, transform=tr, fill=0, dtype="uint8").astype(bool)
+    _, (ri, ci) = ndimage.distance_transform_edt(win_lab < 0, return_indices=True)
+    win_lab = np.where(inside, win_lab[ri, ci], -1)
+    win_lab = ndimage.median_filter(win_lab, size=5)
+
+    parts, claimed = [], []
+    chm_w = grid.chm[r0:r1, c0:c1]
+    valid_w = grid.chm_valid[r0:r1, c0:c1]
+    slope_w = slope[r0:r1, c0:c1]
+    for j in range(len(centers) - 1, 0, -1):
+        mask = ndimage.binary_closing(ndimage.binary_opening(win_lab >= j, iterations=2), iterations=2) & inside
+        for q in polygonize_mask(mask, tr, b["poly"], min_area=30):
+            for prev in claimed:
+                q = q.difference(prev)
+            for qq in polygons_of(q.buffer(0)):
+                if qq.area < 30:
+                    continue
+                qmask = rasterize([(qq, 1)], out_shape=mask.shape, transform=tr, fill=0, dtype="uint8").astype(bool)
+                sel = qmask & valid_w
+                if sel.sum() < 12:
+                    continue
+                dq = (ndimage.distance_transform_edt(qmask) * grid.res)[sel]
+                st = roof_stats(chm_w[sel], dq, slope_w[sel])
+                st["h"] = float(np.clip(st["h"], 3, 120))
+                parts.append({"poly": qq.simplify(0.6, preserve_topology=True), "minH": 0.0, **st})
+                claimed.append(qq)
+    if not parts:
+        return None
+    from shapely.ops import unary_union as _union
+
+    base = b["poly"].difference(_union(claimed).buffer(0.05)).buffer(0)
+    base_polys = [p for p in polygons_of(base) if p.area >= 12]
+    if not base_polys:
+        return None
+    return _union(base_polys), parts
+
+
 def lidar_heights(blds, grid: Grid):
     shapes_ = [(b["poly"], i + 1) for i, b in enumerate(blds)]
     label = rasterize(shapes_, out_shape=(grid.H, grid.W), transform=grid.transform, fill=0, dtype="int32")
@@ -241,46 +312,35 @@ def lidar_heights(blds, grid: Grid):
             b["roof_rgb"] = np.median(rgb[:, cells], axis=1).tolist()
             continue
 
-        # Towers and multi-storey wings: split off sections far above the main roof.
-        p50, p98 = np.percentile(z, [50, 98])
-        tall = np.zeros(len(cells), bool)
-        if p98 - p50 > 6 and b["poly"].area > 120:
-            thresh = (p50 + p98) / 2
-            tall = z > thresh
-            if 0.02 < tall.mean() < 0.7:
-                rows, cols = np.unravel_index(cells, (grid.H, grid.W))
-                r0, r1, c0, c1 = rows.min(), rows.max() + 1, cols.min(), cols.max() + 1
-                win = np.zeros((r1 - r0, c1 - c0), bool)
-                win[rows[tall] - r0, cols[tall] - c0] = True
-                win = ndimage.binary_closing(ndimage.binary_opening(win, iterations=1), iterations=1)
-                tr = from_origin(grid.x0 + c0 * grid.res, grid.y1 - r0 * grid.res, grid.res, grid.res)
-                for q in polygonize_mask(win, tr, b["poly"], min_area=20):
-                    qmask = rasterize([(q, 1)], out_shape=win.shape, transform=tr, fill=0, dtype="uint8").astype(bool)
-                    valid = qmask & grid.chm_valid[r0:r1, c0:c1]
-                    zq = grid.chm[r0:r1, c0:c1][valid]
-                    if len(zq) >= 6:
-                        dq = (ndimage.distance_transform_edt(qmask) * grid.res)[valid]
-                        st = roof_stats(zq, dq, slope[r0:r1, c0:c1][valid])
-                        st["h"] = float(np.clip(st["h"], 3, 120))
-                        b["parts"].append({"poly": q, **st})
-                tall = np.zeros(len(cells), bool) if not b["parts"] else tall
-
-        base = ~tall if (~tall).sum() >= 6 else np.ones(len(cells), bool)
-        st = roof_stats(z[base], dd[cells][base], sl[cells][base])
+        # Buildings OSM maps as one footprint (the Main Quad, the hospital) often hold several masses:
+        # arcades, wings, towers. Cluster the roof heights and give each cluster its own prism and roof.
+        b["render_polys"] = [b["poly"]]
+        nt = b["name_tags"]
+        b["stands"] = tags.get("building") in ("stadium", "grandstand") or nt.get("leisure") == "stadium" or tags.get("leisure") == "stadium"
+        if b["stands"]:
+            low, high = np.percentile(z, [8, 96])
+            b.update(roof="bowl" if b["poly"].interiors else "flat", h=float(max(high, 4)), eave=float(max(low, 1.5)),
+                     rise=float(max(high - max(low, 1.5), 2)), pitch=0.55, roof_rgb=None)
+            continue
+        regions = partition_by_height(b, cells, z, grid, slope)
+        if regions:
+            base_poly, parts = regions
+            b["render_polys"] = polygons_of(base_poly)
+            b["parts"] = parts
+            base_mask = rasterize([(base_poly, 1)], out_shape=(grid.H, grid.W), transform=grid.transform, fill=0, dtype="uint8").ravel()[cells].astype(bool)
+        else:
+            base_mask = np.ones(len(cells), bool)
+        if base_mask.sum() < 6:
+            base_mask = np.ones(len(cells), bool)
+        st = roof_stats(z[base_mask], dd[cells][base_mask], sl[cells][base_mask])
         b.update(st)
         b["h"] = float(np.clip(b["h"], 2.5, 120))
-        for p in b["parts"]:
-            p["minH"] = b.get("eave", b["h"])
-            if p["roof"] == "hipped":
-                p["eave"] = max(p["eave"], p["minH"] + 1.5)
-                p["h"] = p["eave"] + p["rise"]
-            if p["h"] < p["minH"] + 2:
-                p["h"] = p["minH"] + 2
 
         inner = cells[dd[cells] >= 1.0] if (dd[cells] >= 1.0).sum() > 4 else cells
         b["roof_rgb"] = np.median(rgb[:, inner], axis=1).tolist()
     for b in blds:
-        apply_osm_3d(b)
+        if not b.get("stands"):
+            apply_osm_3d(b)
     return label
 
 
@@ -332,6 +392,18 @@ def wall_color(b, roof_rgb, seed):
 
 
 # --------------------------------------------------------------------------- names
+
+
+def rings_of(p):
+    if p.exterior.is_ccw is False:
+        p = Polygon(p.exterior.coords[::-1], [h.coords for h in p.interiors])
+    rings = [[[round(x, 2), round(y, 2)] for x, y in p.exterior.coords]]
+    for hole in p.interiors:
+        hc = list(hole.coords)
+        if Polygon(hc).exterior.is_ccw:
+            hc = hc[::-1]
+        rings.append([[round(x, 2), round(y, 2)] for x, y in hc])
+    return rings
 
 
 def norm(s):
@@ -443,9 +515,14 @@ def detect_trees(grid: Grid, label, osm_trees, palm_lines):
     trees = []
     for x, y, h, r, rr, c in zip(xs, ys, hs, radius, rows, cols):
         col = [float(sm[i][rr, c]) for i in range(3)]
+        # 0 broadleaf, 1 conifer, 2 palm, 3 eucalyptus (tall, narrow, grey-green), 4 oak (low, wide)
         kind = 0
         if h / max(r, 0.5) > 3.4 and sum(col) < 210:
             kind = 1
+        elif h > 21 and r / h < 0.3:
+            kind = 3
+        elif h < 16 and r / h > 0.42:
+            kind = 4
         if osm_kd is not None:
             dd, j = osm_kd.query([x, y])
             if dd < 3.5:
@@ -461,6 +538,16 @@ def detect_trees(grid: Grid, label, osm_trees, palm_lines):
 
 
 def tree_color(rgb, nir, kind, h=10.0, seed=0):
+    """Blend the crown's real colour from the aerial photo with a stylised green for its species group."""
+    styl = _tree_style(rgb, nir, kind, h, seed)
+    real = [min(255, max(0, v * 1.12 + 6)) for v in rgb]
+    hh, ll, ss = colorsys.rgb_to_hls(*[v / 255 for v in real])
+    real = colorsys.hls_to_rgb(hh, min(0.6, ll), min(0.7, ss * 1.25))
+    mix = [0.55 * real[i] + 0.45 * styl[i] for i in range(3)]
+    return "#%02x%02x%02x" % tuple(int(np.clip(c, 0, 1) * 255) for c in mix)
+
+
+def _tree_style(rgb, nir, kind, h, seed):
     r, g, b = [max(0, min(255, v)) / 255 for v in rgb]
     _, l, _ = colorsys.rgb_to_hls(r, g, b)
     vigor = float(np.clip((nir / 255 - r) / (nir / 255 + r + 1e-3), 0, 1))
@@ -472,10 +559,11 @@ def tree_color(rgb, nir, kind, h=10.0, seed=0):
         hue, light, sat = hue + 0.04, light * 0.8, sat * 0.85
     elif kind == 2:
         hue, light, sat = 0.23, light * 1.05, sat * 1.1
-    elif h > 24 and vigor < 0.45:
-        hue, sat = 0.21, sat * 0.6
-    out = colorsys.hls_to_rgb(hue % 1, float(np.clip(light, 0.18, 0.55)), float(np.clip(sat, 0.15, 0.6)))
-    return "#%02x%02x%02x" % tuple(int(c * 255) for c in out)
+    elif kind == 3:
+        hue, light, sat = 0.22, light * 1.1, sat * 0.5
+    elif kind == 4:
+        hue, light, sat = 0.24, light * 0.85, sat * 0.8
+    return colorsys.hls_to_rgb(hue % 1, float(np.clip(light, 0.18, 0.55)), float(np.clip(sat, 0.15, 0.6)))
 
 
 def osm_tree_points(elements):
@@ -490,6 +578,10 @@ def osm_tree_points(elements):
                 kind = 2
             elif t.get("leaf_type") == "needleleaved" or any(w in txt for w in ("pinus", "pine", "sequoia", "redwood", "cedrus", "cedar", "cupressus", "cypress")):
                 kind = 1
+            elif "eucalyptus" in txt:
+                kind = 3
+            elif "quercus" in txt or " oak" in f" {txt}":
+                kind = 4
             elif t.get("leaf_type") == "broadleaved":
                 kind = 0
             out.append((x, y, kind))
@@ -570,7 +662,45 @@ def landcover_image(grid: Grid, label):
     drift = ndimage.gaussian_filter(rng.standard_normal(r.shape).astype(np.float32), 18) * 9
     img = img * (1 + detail[..., None]) + drift[..., None]
     img = np.clip(img, 0, 255).astype(np.uint8)
-    return Image.fromarray(img).resize((grid.W, grid.H), Image.NEAREST)
+    palette_img = np.asarray(Image.fromarray(img).resize((grid.W, grid.H), Image.NEAREST)).astype(np.float32)
+
+    # Open ground shows the real aerial photo, posterised so it reads as pixel art; hidden ground keeps the palette.
+    photo = naip_stylized(grid)
+    hidden = ((grid.vh > 2.5) & (((grid.naip[3].astype(np.float32) - grid.naip[0]) / (grid.naip[3].astype(np.float32) + grid.naip[0] + 1e-3)) > 0.12)) | ndimage.binary_dilation(label > 0, iterations=3)
+    w = ndimage.gaussian_filter((~hidden).astype(np.float32), 1.0)[..., None] * 0.78
+    out = palette_img * (1 - w) + photo * w
+    return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8))
+
+
+def naip_stylized(grid: Grid):
+    rgb = np.moveaxis(grid.naip[:3], 0, -1)
+    rgb = np.stack([ndimage.median_filter(rgb[..., i], size=3) for i in range(3)], axis=-1)
+    hsv = np.asarray(Image.fromarray(rgb).convert("HSV")).astype(np.float32)
+    hsv[..., 1] = np.clip(hsv[..., 1] * 1.22, 0, 255)
+    hsv[..., 2] = np.clip(hsv[..., 2] * 1.05 + 10, 0, 255)
+    hsv[..., 2] = np.round(hsv[..., 2] / 255 * 18) / 18 * 255
+    hsv[..., 1] = np.round(hsv[..., 1] / 255 * 12) / 12 * 255
+    return np.asarray(Image.fromarray(hsv.astype(np.uint8), "HSV").convert("RGB")).astype(np.float32)
+
+
+def roof_texture(grid: Grid, label):
+    """The aerial photo as seen on rooftops: posterised, with overhanging canopy replaced by nearby roof."""
+    photo = naip_stylized(grid)
+    r, n = grid.naip[0].astype(np.float32), grid.naip[3].astype(np.float32)
+    bad = ~((label > 0) & (((n - r) / (n + r + 1e-3)) < 0.18))
+    _, (ri, ci) = ndimage.distance_transform_edt(bad, return_indices=True)
+    return Image.fromarray(photo[ri, ci].astype(np.uint8))
+
+
+def water_share(grid: Grid, poly):
+    """Fraction of a polygon that the aerial photo shows as open water."""
+    m = rasterize([(poly, 1)], out_shape=(grid.H, grid.W), transform=grid.transform, fill=0, dtype="uint8").astype(bool)
+    if m.sum() < 10:
+        return 1.0
+    r, g, b, n = [grid.naip[i][m].astype(np.float32) for i in range(4)]
+    ndvi = (n - r) / (n + r + 1e-3)
+    wet = (ndvi < 0.05) & (b >= r * 0.9) & ((r + g + b) / 3 < 140)
+    return float(wet.mean())
 
 
 def paint_ground(cam: Camera, grid: Grid, elements, region, label):
@@ -645,6 +775,8 @@ def paint_ground(cam: Camera, grid: Grid, elements, region, label):
 
     for kind in ("parking", "plaza", "sand", "pitch", "track_area", "court", "pool", "water"):
         for g, t in areas.get(kind, []):
+            if kind == "water" and water_share(grid, g) < 0.35:
+                continue
             paint_area(draw, cam, kind, g, t)
 
     for line, w, col in sorted(paths, key=lambda p: p[1]):
@@ -913,50 +1045,36 @@ def main():
         b["main_quad"] = bool(off and "MAIN QUAD" in off["raw"])
         roof = stylize_roof(b.get("roof_rgb"), b["roof"])
         wall = wall_color(b, roof, zlib.crc32(b["osm"].encode()))
+        if b.get("stands"):
+            roof, wall = (156, 52, 48), (196, 192, 184)
         p = b["poly"]
-        if p.exterior.is_ccw is False:
-            p = Polygon(p.exterior.coords[::-1], [h.coords for h in p.interiors])
-        rings = [[[round(x, 2), round(y, 2)] for x, y in p.exterior.coords]]
-        for hole in p.interiors:
-            hc = list(hole.coords)
-            if Polygon(hc).exterior.is_ccw:
-                hc = hc[::-1]
-            rings.append([[round(x, 2), round(y, 2)] for x, y in hc])
-        rec = {
-            "id": i,
-            "rings": rings,
-            "h": round(b["h"], 2),
-            "roof": b["roof"],
-            "roofColor": "#%02x%02x%02x" % roof,
-            "wallColor": "#%02x%02x%02x" % wall,
-            "category": b["category"],
+        base = {
+            "h": b["h"], "roof": b["roof"], "minH": b.get("minH", 0),
+            **({k: b[k] for k in ("eave", "pitch", "rise")} if b["roof"] in ("hipped", "dome", "bowl") else {}),
         }
-        if b.get("minH"):
-            rec["minH"] = round(b["minH"], 2)
-        if b["roof"] in ("hipped", "dome"):
-            rec["eave"] = round(b["eave"], 2)
-            rec["pitch"] = round(b["pitch"], 3)
-            rec["rise"] = round(b["rise"], 2)
-        if short:
-            rec["name"] = short
-        buildings_out.append(rec)
-        for part in b.get("parts", []):
-            q = part["poly"]
-            if q.exterior.is_ccw is False:
-                q = Polygon(q.exterior.coords[::-1])
-            buildings_out.append({
-                "id": len(buildings_out) + 100000,
-                "rings": [[[round(x, 2), round(y, 2)] for x, y in q.exterior.coords]],
-                "h": round(part["h"], 2),
-                "minH": round(part["minH"], 2),
-                "roof": part["roof"],
-                **({"eave": round(part["eave"], 2), "pitch": round(part["pitch"], 3), "rise": round(part["rise"], 2)}
-                   if part["roof"] == "hipped" else {}),
-                "roofColor": rec["roofColor"],
-                "wallColor": rec["wallColor"],
-                "category": rec["category"],
-                **({"name": short} if short else {}),
-            })
+        pieces = [(q, base) for q in b.get("render_polys", [p])] + [(pt["poly"], pt) for pt in b.get("parts", [])]
+        for q, st in pieces:
+            for qq in polygons_of(q):
+                rec = {
+                    "id": len(buildings_out),
+                    "rings": rings_of(qq),
+                    "h": round(st["h"], 2),
+                    "roof": st["roof"],
+                    "roofColor": "#%02x%02x%02x" % roof,
+                    "wallColor": "#%02x%02x%02x" % wall,
+                    "category": b["category"],
+                }
+                if st.get("minH"):
+                    rec["minH"] = round(st["minH"], 2)
+                if b.get("stands"):
+                    rec["stands"] = True
+                if st["roof"] in ("hipped", "dome", "bowl"):
+                    rec["eave"] = round(st["eave"], 2)
+                    rec["pitch"] = round(st["pitch"], 3)
+                    rec["rise"] = round(st["rise"], 2)
+                if short:
+                    rec["name"] = short
+                buildings_out.append(rec)
 
         if short and not N.skip_label(raw or short.upper()) and b["group"] not in labeled:
             labeled.add(b["group"])
@@ -1003,6 +1121,8 @@ def main():
         group, short = N.split_complex(o["raw"])
         sx, sy = cam.screen(c.x, c.y, h)
         places.append({"name": short, "group": group, "category": N.categorize(o["raw"], group, {}), "x": round(sx, 1), "y": round(sy, 1), "rank": N.LANDMARKS.get(o["raw"], 2), "kind": "building", "official": N.pretty(o["raw"]), "bldgId": o["id"]})
+        if group:
+            groups[group].append((c.x, c.y, h, N.categorize(o["raw"], group, {})))
 
     for g, pts in groups.items():
         arr = np.array([(x, y, h) for x, y, h, _ in pts])
@@ -1069,7 +1189,9 @@ def main():
     trees = [t for t in trees if rp.contains(Point(t[0], t[1]))]
     print(f"{len(trees)} trees")
 
-    scene = {"camera": cam.to_json(), "sun": sun_vector(cam), "region": [list(p) for p in region.exterior.coords], "buildings": buildings_out, "trees": trees}
+    roof_texture(grid, label).save(BUILD / "roofs.png", compress_level=1)
+    scene = {"camera": cam.to_json(), "sun": sun_vector(cam), "region": [list(p) for p in region.exterior.coords], "buildings": buildings_out, "trees": trees,
+             "roofTex": {"x0": grid.x0, "y1": grid.y1, "res": grid.res, "w": grid.W, "h": grid.H}}
     (BUILD / "scene.json").write_text(json.dumps(scene, separators=(",", ":")))
     print(f"wrote scene.json: {len(buildings_out)} buildings")
 
