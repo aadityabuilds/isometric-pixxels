@@ -301,12 +301,16 @@ async function buildBuildings(data, viewDir) {
   return mesh.build();
 }
 
+// ?massing=1 renders plain blocks (real footprints, heights and roofs, no windows or textures) as a layout guide.
+const MASSING = new URLSearchParams(location.search).get("massing") === "1";
+
 const buildingMaterial = (roofTex, rt) =>
   new THREE.ShaderMaterial({
     side: THREE.DoubleSide,
     vertexColors: true,
     uniforms: {
       tRoof: { value: roofTex },
+      massing: { value: MASSING ? 1 : 0 },
       roofBox: { value: new THREE.Vector4(rt.x0, rt.y1, rt.w * rt.res, rt.h * rt.res) },
     },
     vertexShader: /* glsl */ `
@@ -326,6 +330,7 @@ const buildingMaterial = (roofTex, rt) =>
     fragmentShader: /* glsl */ `
       uniform sampler2D tRoof;
       uniform vec4 roofBox;
+      uniform float massing;
       varying vec3 vColor;
       varying vec2 vUv;
       varying vec2 vInfo;
@@ -333,6 +338,10 @@ const buildingMaterial = (roofTex, rt) =>
       void main() {
         vec3 c = vColor;
         float style = vInfo.x;
+        if (massing > 0.5) {
+          gl_FragColor = vec4(c, style > 4.5 ? 1.0 : 0.6);
+          return;
+        }
         if (style > 4.5 && style < 6.5) {
           // Rooftops show the real aerial photo, lit like the rest of the roof.
           vec2 ruv = vec2((vPos.x - roofBox.x) / roofBox.z, (roofBox.y - vPos.y) / roofBox.w);
@@ -539,6 +548,12 @@ async function init() {
   const data = await (await fetch("/data/build/scene.json")).json();
   window.sceneInfo = { camera: data.camera, buildings: data.buildings.length, trees: data.trees.length };
   sun = data.sun;
+  if (MASSING) {
+    for (const b of data.buildings) {
+      b.wallColor = "#e2ddd2";
+      b.roofColor = b.roof === "flat" ? "#bab6ae" : b.stands ? "#b0aaa0" : "#c98466";
+    }
+  }
   const b = (data.camera.bearing * Math.PI) / 180;
   const viewDir = [-Math.sin(b), -Math.cos(b)];
   scene = new THREE.Scene();

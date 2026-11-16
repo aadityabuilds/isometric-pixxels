@@ -3,7 +3,7 @@ import base64, json, os, sys, time
 import requests
 from pathlib import Path
 
-KEY = os.environ["GEMINI_API_KEY"]
+KEY = os.environ.get("GEMINI_API_KEY", "")
 URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
 LEDGER = Path(__file__).with_name("ledger.jsonl")
 PRICE = {  # USD

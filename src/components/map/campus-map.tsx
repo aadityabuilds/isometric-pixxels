@@ -20,6 +20,9 @@ export interface CampusMapHandle {
 
 interface Props {
   tilesUrl: string;
+  /** Optional AI-illustrated layer drawn over the plain render with the same camera. */
+  tilesAiUrl?: string;
+  showAi?: boolean;
   imageWidth: number;
   places: Place[];
   visible: Set<Category>;
@@ -39,7 +42,8 @@ interface Props {
 const HIT_CELL = 256;
 
 export function CampusMap(props: Props) {
-  const { tilesUrl, imageWidth, places, visible, showLabels, world, liveEnabled, preset, selectedId, ref } = props;
+  const { tilesUrl, tilesAiUrl, showAi = true, imageWidth, places, visible, showLabels, world, liveEnabled, preset, selectedId, ref } = props;
+  const showAiRef = useRef(showAi);
   const container = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<OpenSeadragon.Viewer | null>(null);
   const osdRef = useRef<typeof OpenSeadragon | null>(null);
@@ -125,21 +129,27 @@ export function CampusMap(props: Props) {
         gestureSettingsTouch: { pinchRotate: false },
       });
       viewerRef.current = viewer;
+      const base = () => viewer.world.getItemAt(0);
 
       const emit = () => {
-        const vp = viewer.viewport;
-        const a = vp.imageToViewerElementCoordinates(new OSD.Point(0, 0));
-        const b = vp.imageToViewerElementCoordinates(new OSD.Point(imageWidth, 0));
+        const img = base();
+        if (!img) return;
+        const a = img.imageToViewerElementCoordinates(new OSD.Point(0, 0));
+        const b = img.imageToViewerElementCoordinates(new OSD.Point(imageWidth, 0));
         const el = viewer.container;
         bus.set({ ox: a.x, oy: a.y, scale: (b.x - a.x) / imageWidth, w: el.clientWidth, h: el.clientHeight });
       };
       viewer.addHandler("open", () => {
+        if (tilesAiUrl && viewer.world.getItemCount() === 1) {
+          viewer.addTiledImage({ tileSource: tilesAiUrl, opacity: showAiRef.current ? 1 : 0, index: 1 });
+        }
         if (viewer.container.clientWidth < 640) {
           const vp = viewer.viewport;
+          const img = base();
           const quad = places.find((p) => p.id === "main-quad");
           const c = quad ? new OSD.Point(quad.x, quad.y) : new OSD.Point(imageWidth / 2, imageWidth / 4);
-          vp.zoomTo(vp.imageToViewportZoom(0.22), undefined, true);
-          vp.panTo(vp.imageToViewportCoordinates(c), true);
+          vp.zoomTo(img.imageToViewportZoom(0.22), undefined, true);
+          vp.panTo(img.imageToViewportCoordinates(c), true);
         }
         emit();
         cb.current.onReady();
@@ -151,7 +161,7 @@ export function CampusMap(props: Props) {
       viewer.addHandler("animation-finish", () => cb.current.onIdle?.());
 
       const hit = (pos: OpenSeadragon.Point) => {
-        const p = viewer.viewport.viewerElementToImageCoordinates(pos);
+        const p = base().viewerElementToImageCoordinates(pos);
         const list = hitRef.current.get(`${Math.floor(p.x / HIT_CELL)},${Math.floor(p.y / HIT_CELL)}`) ?? [];
         for (const t of list) {
           const [x0, y0, x1, y1] = t.bbox;
@@ -180,7 +190,13 @@ export function CampusMap(props: Props) {
     };
     // The viewer is created once per tile set; places only seed the initial mobile view.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tilesUrl, imageWidth, bus]);
+  }, [tilesUrl, tilesAiUrl, imageWidth, bus]);
+
+  useEffect(() => {
+    showAiRef.current = showAi;
+    const item = viewerRef.current?.world.getItemAt(1);
+    item?.setOpacity(showAi ? 1 : 0);
+  }, [showAi]);
 
   useImperativeHandle(
     ref,
@@ -190,10 +206,11 @@ export function CampusMap(props: Props) {
         const OSD = osdRef.current;
         if (!viewer || !OSD) return;
         const vp = viewer.viewport;
-        const target = vp.imageToViewportCoordinates(new OSD.Point(place.x, place.y + 40));
-        const current = vp.viewportToImageZoom(vp.getZoom(true));
+        const img = viewer.world.getItemAt(0);
+        const target = img.imageToViewportCoordinates(new OSD.Point(place.x, place.y + 40));
+        const current = img.viewportToImageZoom(vp.getZoom(true));
         const z = place.kind === "complex" || place.kind === "area" ? Math.min(zoom, 0.7) : zoom;
-        vp.zoomTo(vp.imageToViewportZoom(Math.max(current, z)), undefined, false);
+        vp.zoomTo(img.imageToViewportZoom(Math.max(current, z)), undefined, false);
         vp.panTo(target, false);
       },
       zoomBy(factor) {
@@ -209,8 +226,9 @@ export function CampusMap(props: Props) {
         const viewer = viewerRef.current;
         if (!viewer) return null;
         const vp = viewer.viewport;
-        const c = vp.viewportToImageCoordinates(vp.getCenter(true));
-        const z = vp.viewportToImageZoom(vp.getZoom(true));
+        const img = viewer.world.getItemAt(0);
+        const c = img.viewportToImageCoordinates(vp.getCenter(true));
+        const z = img.viewportToImageZoom(vp.getZoom(true));
         return `@${Math.round(c.x)},${Math.round(c.y)},${z.toFixed(2)}`;
       },
       applyViewHash(hash, immediately = false) {
@@ -219,8 +237,9 @@ export function CampusMap(props: Props) {
         const m = /^@(-?\d+),(-?\d+),([\d.]+)$/.exec(hash);
         if (!viewer || !OSD || !m) return false;
         const vp = viewer.viewport;
-        vp.zoomTo(vp.imageToViewportZoom(Number(m[3])), undefined, immediately);
-        vp.panTo(vp.imageToViewportCoordinates(new OSD.Point(Number(m[1]), Number(m[2]))), immediately);
+        const img = viewer.world.getItemAt(0);
+        vp.zoomTo(img.imageToViewportZoom(Number(m[3])), undefined, immediately);
+        vp.panTo(img.imageToViewportCoordinates(new OSD.Point(Number(m[1]), Number(m[2]))), immediately);
         return true;
       },
     }),

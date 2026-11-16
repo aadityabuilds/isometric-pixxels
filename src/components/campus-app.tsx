@@ -65,7 +65,8 @@ function subscribeNarrow(cb: () => void) {
 
 const chrome = "border border-[#f1e8d2]/14 bg-[#201e1c]/94 text-[#f1e8d2] shadow-[0_8px_24px_rgba(10,9,8,0.32),0_1px_3px_rgba(10,9,8,0.38)] backdrop-blur";
 
-export function CampusApp({ tilesUrl, camera }: { tilesUrl: string; camera: CampusCamera }) {
+export function CampusApp({ tilesUrl, tilesAiUrl, camera }: { tilesUrl: string; tilesAiUrl: string | null; camera: CampusCamera }) {
+  const [showAi, setShowAi] = useState(true);
   const [data, setData] = useState<PlacesFile | null>(null);
   const [tour, setTour] = useState<TourStop[]>([]);
   const [status, setStatus] = useState<Status>("loading");
@@ -211,6 +212,7 @@ export function CampusApp({ tilesUrl, camera }: { tilesUrl: string; camera: Camp
       else if (e.key === "-" || e.key === "_") mapRef.current?.zoomBy(1 / 1.5);
       else if (e.key === "0") mapRef.current?.home();
       else if (k === "n") setShowLabels((s) => !s);
+      else if (k === "l" && tilesAiUrl) setShowAi((s) => !s);
       else if (k === "t") setLive((s) => !s);
       else if (k === "p") setPanel((s) => !s);
       else if (k === "f") toggleFullscreen();
@@ -221,7 +223,7 @@ export function CampusApp({ tilesUrl, camera }: { tilesUrl: string; camera: Camp
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [select, selectedId, toggleFullscreen, tourIndex, stepTour]);
+  }, [select, selectedId, toggleFullscreen, tourIndex, stepTour, tilesAiUrl]);
 
   const toggleCategory = (c: Category) =>
     setVisible((v) => {
@@ -274,6 +276,8 @@ export function CampusApp({ tilesUrl, camera }: { tilesUrl: string; camera: Camp
         <CampusMap
           ref={mapRef}
           tilesUrl={tilesUrl}
+          tilesAiUrl={tilesAiUrl ?? undefined}
+          showAi={showAi}
           imageWidth={camera.width}
           places={places}
           visible={visible}
@@ -348,6 +352,9 @@ export function CampusApp({ tilesUrl, camera }: { tilesUrl: string; camera: Camp
                 </Tooltip>
                 <PopoverContent side="left" align="center" className={cn("w-[300px] p-3", chrome)}>
                   <LayersPanel
+                    hasAi={!!tilesAiUrl}
+                    showAi={showAi}
+                    setShowAi={setShowAi}
                     showLabels={showLabels}
                     setShowLabels={setShowLabels}
                     live={live}
@@ -467,6 +474,9 @@ function Count({ icon, value, label }: { icon: ReactNode; value: string; label: 
 }
 
 function LayersPanel(props: {
+  hasAi: boolean;
+  showAi: boolean;
+  setShowAi(v: boolean): void;
   showLabels: boolean;
   setShowLabels(v: boolean): void;
   live: boolean;
@@ -479,6 +489,7 @@ function LayersPanel(props: {
 }) {
   return (
     <div className="space-y-3 text-[#f1e8d2]">
+      {props.hasAi && <Row label="AI illustration (Nano Banana)" hint="L" checked={props.showAi} onChange={props.setShowAi} />}
       <Row label="Place and street names" hint="N" checked={props.showLabels} onChange={props.setShowLabels} />
       <Row label="People, bikes and traffic" hint="T" checked={props.live} onChange={props.setLive} note={props.loading ? "Loading…" : undefined} />
       <div>

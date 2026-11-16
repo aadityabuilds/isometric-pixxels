@@ -42,7 +42,8 @@ async function main() {
   const page = await browser.newPage();
   page.on("console", (m) => console.log("[page]", m.text()));
   page.on("pageerror", (e) => console.error("[page error]", e.message));
-  await page.goto(`http://127.0.0.1:${port}/render/index.html`);
+  const massing = args.includes("--massing") ? "?massing=1" : "";
+  await page.goto(`http://127.0.0.1:${port}/render/index.html${massing}`);
   await page.waitForFunction(() => window.ready || window.initError, null, { timeout: 600000 });
   const err = await page.evaluate(() => window.initError);
   if (err) throw new Error(err);
@@ -54,7 +55,8 @@ async function main() {
     return Buffer.from(url.split(",")[1], "base64");
   };
 
-  await mkdir(join(OUT, "tiles"), { recursive: true });
+  const outDir = args.includes("--outdir") ? args[args.indexOf("--outdir") + 1] : join(OUT, "tiles");
+  await mkdir(outDir, { recursive: true });
   if (win) {
     const t0 = Date.now();
     await writeFile(join(OUT, "window.png"), await render(...win));
@@ -67,11 +69,11 @@ async function main() {
       for (let tx = 0; tx < cols; tx++) {
         const t0 = Date.now();
         const png = await render(tx * TILE - MARGIN, ty * TILE - MARGIN, TILE + 2 * MARGIN, TILE + 2 * MARGIN);
-        await writeFile(join(OUT, "tiles", `${tx}_${ty}.png`), png);
+        await writeFile(join(outDir, `${tx}_${ty}.png`), png);
         console.log(`tile ${tx},${ty} in ${Date.now() - t0} ms`);
       }
     }
-    await writeFile(join(OUT, "tiles", "manifest.json"), JSON.stringify(manifest));
+    await writeFile(join(outDir, "manifest.json"), JSON.stringify(manifest));
   }
   await browser.close();
   server.close();

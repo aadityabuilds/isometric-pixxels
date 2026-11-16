@@ -7,6 +7,7 @@ const KEYS: [string, string][] = [
   ["/", "Search"],
   ["P", "Places & tour"],
   ["N", "Labels on or off"],
+  ["L", "AI illustration or plain render"],
   ["T", "People & traffic on or off"],
   ["F", "Full screen"],
   ["H", "Hide tools"],
@@ -30,6 +31,10 @@ export function AboutDialog({ open, onOpenChange, attribution }: { open: boolean
           <li>Heights, roof shapes and about 57,000 trees are measured from the USGS 2020 lidar survey of Santa Clara County.</li>
           <li>Roof and ground colours come from 2024 USDA aerial photography, posterised so it reads as pixel art.</li>
           <li>A program renders it all with one fixed camera, 30° above the ground and 45° off the campus grid, at about 3 pixels per metre.</li>
+          <li>
+            The illustrated layer was redrawn tile by tile with Google&apos;s Nano Banana image models, given the plain render&apos;s
+            geometry, the aerial photo and freely licensed Wikimedia Commons photos of each area. Press L to compare it with the plain render.
+          </li>
           <li>People, bikes and cars follow the real street and path network; shuttles follow Stanford&apos;s published Marguerite timetable.</li>
         </ul>
         <h3 className="mt-2 font-pixel text-[12px] uppercase tracking-[0.12em] text-[#e9c46a]">Getting around</h3>
