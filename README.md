@@ -2,7 +2,8 @@
 
 Isometric SimCity-style map of Stanford campus, from open data, with a live people/traffic layer and a Nano Banana illustrated overlay. The remaining job is to **fine-tune Qwen-Image-Edit-2511 on those Nano Banana tiles** and regenerate the campus locally on Sherlock so we stop paying Gemini.
 
-GitHub (source of truth as of 17 Nov 2026): https://github.com/aadityabuilds/isometric-pixxels
+GitHub (source of truth): https://github.com/aadityabuilds/isometric-pixxels
+Last teacher-data push: **17 Nov 2026, commit `cc9fb96`** — every Nano Banana image we generated is in this repo. A clone can train without calling Gemini.
 
 Owner: Aaditya Nalawade (`aadityabuilds` on GitHub and Hugging Face, `aaditya1@stanford.edu`). Hugging Face account is **free** (no Jobs). Training target is **Stanford Sherlock**, not this laptop and not HF Jobs.
 
@@ -12,7 +13,7 @@ This file is the handoff for the next agent. Read it before changing anything.
 
 ## Current state (one paragraph)
 
-The app is a working Next.js viewer. You can pan/zoom a truthful-from-above isometric render of campus, search 845 named places, run a 32-stop tour, and watch students/bikes/cars/Marguerite shuttles on a live layer. Press **L** to toggle a second Deep Zoom pyramid: the same camera, redrawn tile-by-tile by Gemini Nano Banana 2.1 (~50 tiles, ~$4.07 including tests and west-campus fixes). Those tiles are **style targets**, not the end product. Training pairs (175 overlapping 1024×1024 crops: plain render → Nano Banana) are prepared. Training has **not** been run. There is no GPU on the machine that built this. Sherlock is the plan.
+The app is a working Next.js viewer. You can pan/zoom a truthful-from-above isometric render of campus, search 845 named places, run a 32-stop tour, and watch students/bikes/cars/Marguerite shuttles on a live layer. Press **L** to toggle a second Deep Zoom pyramid: the same camera, redrawn tile-by-tile by Gemini Nano Banana 2.1 (~50 tiles, ~$4.07 including tests and west-campus fixes). Those tiles are **style targets**, not the end product. Training pairs (175 overlapping 1024×1024 crops: plain render → Nano Banana) are **in git**. Training has **not** been run. There is no GPU on the machine that built this. Sherlock is the plan.
 
 ---
 
@@ -61,8 +62,11 @@ public/tiles/6afb855b-ai/    Nano Banana Deep Zoom (committed)
 public/data/places.json      845 places, camera, tiles, tilesAi, occlusion path
 experiments/style-test/      FLUX Kontext / schnell / Qwen Spaces tests (done)
 experiments/nanobanana/      Gemini campus redraw + west/Row seam fixes
+  quad_tests/                first Quad cluster Gemini outputs (were in /tmp)
 experiments/qwen-lora/       musubi-tuner dataset + Sherlock train/infer scripts
-data/                        GITIGNORED. See "Critical: data is not on GitHub"
+data/ai/                     Nano Banana teacher set (TRACKED — see inventory below)
+data/build/final.png         plain-render composite (TRACKED)
+data/raw/                    NOT in git (lidar/NAIP over GitHub 100 MB limit)
 ```
 
 `places.json` currently points at:
@@ -206,6 +210,37 @@ At inference, stack the [Lightning 4-step LoRA](https://huggingface.co/lightx2v/
 - A Cursor Cloud publish of the web app was proposed as slug `pixel-stanford` (user confirms in the Publish dialog). Do not invent a preview URL.
 - Do not add auth, a database, or a second component library unless asked.
 
+### 6. Teacher data landed on GitHub (17 Nov 2026)
+
+The first GitHub push was code + viewer tiles only. `data/` was gitignored, so a clone could **not** train. Two follow-up commits put the full Nano Banana set on `main`:
+
+| Commit | What |
+| --- | --- |
+| `7b941e9` | ~856 MB: LoRA pairs, `ai_final.png` + three backups, all campus tiles, west plates, raw Gemini jpgs, `final.png`, `scene.json`, `state.json`, mask, layout/aerial inputs |
+| `cc9fb96` | Leftovers: 5 superseded lake tiles (`data/ai/tiles_backup/`) and the three Quad cluster tests that had been sitting in `/tmp/nb/` |
+
+GitHub warned that the four `ai_final*.png` files are ~56 MB (over the 50 MB recommendation, under the 100 MB hard limit). They pushed as normal git blobs, not LFS. Do not convert them to LFS unless a later push is rejected.
+
+**Inventory of every Nano Banana image now in the repo** (verified against `experiments/nanobanana/ledger.jsonl`, 64 Gemini calls, $4.07):
+
+| Location | Count | What |
+| --- | --- | --- |
+| `data/ai/tiles/*.png` | 50 campus + 5 west plates | Finished tiles used in the composite. `state.json` lists the 50. West files: `west_lake.png`, `west_lake_v2.png`, `west_row.png`, `west_row_v2.png`, `west_row_seam.png` |
+| `data/ai/raw/*.jpg` | 50 campus + 5 west plates | Direct Gemini outputs before paste/feather |
+| `data/ai/ai_final.png` | 1 | Current full-campus teacher (~57 MB, 10607×5660) |
+| `data/ai/ai_final.before_{lake,west,row_seam}.png` | 3 | Snapshots before those redraws. Restore if a later composite goes wrong |
+| `data/ai/tiles_backup/` | 5 | Older lake-region tiles (`3584_896`, `4480_0`, `4480_896`, `5376_0`, `5376_896`) replaced by the 2K west plates |
+| `experiments/nanobanana/quad_tests/` | 3 | First cluster tests: `pro_v1.jpg` (Nano Banana Pro), `pro_v2.jpg` (Pro + pixel prompt), `nb21_v2.jpg` (2.1). Ledger wrote these to `/tmp/nb/`; copies now live here |
+| `experiments/nanobanana/{cluster,hoover,memchu,style_anchor*}.jpg` | already on main | Same Quad test, cropped for the README-era writeup |
+| `public/tiles/6afb855b-ai/` | Deep Zoom | Viewer layer; `places.json` `tilesAi` points here. Recut after the Row-seam fix |
+| `data/ai/lora_pairs/` | 175 control + 175 target jpgs | Sliding 1024 crops of `final.png` → `ai_final.png`. **This is the training set.** |
+
+Not Nano Banana, still tracked because inference needs them: `data/build/final.png`, `data/build/scene.json`, `data/ai/mask.png`, `data/ai/layout.png`, `data/ai/aerial.png`, `data/ai/ground_soft.png`.
+
+**Still not in git (not generated images):** `data/ai/massing.v` (~302 MB three.js dump, over GitHub’s 100 MB cap), `data/raw/lidar.npz` (270 MB), `data/raw/naip.npz` (140 MB). Re-run `npm run map:fetch` / `map:build` only if you need to rebuild the plain map. You do **not** need them to train.
+
+Do **not** call Gemini again to reconstruct the teacher. If a file looks missing, `git pull` and look in the table above before spending API budget.
+
 ---
 
 ## What is and is not in git
@@ -217,12 +252,14 @@ At inference, stack the [Lightning 4-step LoRA](https://huggingface.co/lightx2v/
 | `data/ai/lora_pairs/` | yes | 175 control/target jpgs + captions — **train with this** |
 | `data/ai/ai_final.png` | yes | full Nano Banana composite (~57 MB) |
 | `data/ai/ai_final.before_*.png` | yes | backups before lake / west / Row-seam redraws |
-| `data/ai/tiles/`, `data/ai/raw/` | yes | per-tile Gemini outputs |
+| `data/ai/tiles/`, `data/ai/raw/` | yes | per-tile Gemini outputs (50 campus + 5 west plates each) |
+| `data/ai/tiles_backup/` | yes | 5 superseded lake tiles, added in `cc9fb96` |
+| `experiments/nanobanana/quad_tests/` | yes | first three Quad Gemini tests, added in `cc9fb96` |
 | `data/ai/state.json`, `mask.png` | yes | which tiles exist; coverage mask for `build_dataset.py` |
 | `data/build/final.png` | yes | plain-render composite — LoRA **control** at inference |
 | `data/build/scene.json` | yes | fused scene used by the renderer |
 | `data/raw/` (lidar.npz, naip.npz, osm.json) | **no** | 270 MB + 140 MB, over GitHub’s 100 MB file limit. Re-fetch. |
-| `data/build/objects.v`, `data/ai/massing.v` | **no** | 288 MB three.js dumps. Re-render. |
+| `data/build/objects.v`, `data/ai/massing.v` | **no** | ~288–302 MB three.js dumps. Re-render. |
 
 A fresh clone **can train**. Copy `data/ai/lora_pairs` onto Sherlock `$SCRATCH` (home quota is small) and run `sbatch experiments/qwen-lora/sherlock.sbatch`.
 
@@ -239,6 +276,9 @@ Owner can SSH to Sherlock. This Cloud Agent could not: no SSH keys, Stanford Duo
 ```bash
 git clone https://github.com/aadityabuilds/isometric-pixxels.git
 cd isometric-pixxels
+# pairs are already in the clone; copy off $HOME because Sherlock home quota is small
+mkdir -p $SCRATCH/pixel-stanford
+cp -a data/ai/lora_pairs $SCRATCH/pixel-stanford/
 export PAIRS=$SCRATCH/pixel-stanford/lora_pairs
 export MODELS=$SCRATCH/qwen-edit-2511
 export OUT=$SCRATCH/pixel-stanford-lora
