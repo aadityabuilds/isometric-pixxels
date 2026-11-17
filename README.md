@@ -25,7 +25,7 @@ npm install
 npm run dev          # http://localhost:4317
 ```
 
-Rendered tiles, labels, tour, street network, shuttle GTFS-derived trips and sprites are **committed**. The app runs without the Python pipeline and without `data/`.
+Rendered tiles, labels, tour, street network, shuttle GTFS-derived trips and sprites are committed, so the viewer runs with `npm install && npm run dev`. Nano Banana composites, LoRA pairs, and `data/build/final.png` are also in the repo. You do **not** need to re-run Gemini to train. Lidar/NAIP/OSM fetches (`data/raw/`) are still gitignored (~700 MB); re-run `npm run map:fetch` only if you need to rebuild the plain map from scratch.
 
 | Key | Action |
 | --- | --- |
@@ -169,7 +169,7 @@ Same recipe as Pixel Chennai and Isometric NYC: **control = plain render, target
 pipeline/.venv/bin/python experiments/qwen-lora/build_dataset.py
 ```
 
-Writes `data/ai/lora_pairs/{control,target}/` (gitignored). **175** pairs, 1024×1024, step 512 over the finished maps, plus the exact Nano Banana tiles first. Crops with <28% coverage of the map mask are skipped. Same caption on every pair:
+Writes `data/ai/lora_pairs/{control,target}/` (**tracked in git**, 175 pairs). 1024×1024, step 512 over the finished maps, plus the exact Nano Banana tiles first. Crops with <28% coverage of the map mask are skipped. Same caption on every pair:
 
 > Redraw this isometric Stanford campus render as SimCity 2000 pixel art. Keep the camera, every building footprint, road, path, lawn and tree exactly in place. Buff sandstone or cream stucco, red clay tile roofs, crisp pixel outlines, empty campus. No people, no cars, no signs, no lettering.
 
@@ -208,41 +208,29 @@ At inference, stack the [Lightning 4-step LoRA](https://huggingface.co/lightx2v/
 
 ---
 
-## Critical: `data/` is not on GitHub
+## What is and is not in git
 
-`.gitignore` excludes `/data/` (also `.venv`, `.next`, `render/out`, `render/dist`). A fresh clone **cannot train** and **cannot rebuild Nano Banana composites**.
-
-On the machine that produced this (Cursor Cloud Agent VM), `data/` is ~2 GB:
-
-| Path | Size | What |
+| Path | In git? | Why |
 | --- | --- | --- |
-| `data/raw/` | ~421 MB | OSM, lidar, NAIP, GTFS, Stanford names |
-| `data/build/final.png` | (inside ~465 MB build) | plain-render composite — **LoRA control source** |
-| `data/ai/ai_final.png` | ~57 MB | Nano Banana composite — **LoRA target source** |
-| `data/ai/lora_pairs/` | ~144 MB | 175 jpg pairs + captions, ready to train |
-| `data/ai/tiles/`, `raw/`, backups | rest | per-tile Gemini outputs and `ai_final.before_*.png` backups |
+| `public/tiles/6afa80bc/` | yes | plain-render Deep Zoom (viewer) |
+| `public/tiles/6afb855b-ai/` | yes | Nano Banana Deep Zoom (viewer, press L) |
+| `data/ai/lora_pairs/` | yes | 175 control/target jpgs + captions — **train with this** |
+| `data/ai/ai_final.png` | yes | full Nano Banana composite (~57 MB) |
+| `data/ai/ai_final.before_*.png` | yes | backups before lake / west / Row-seam redraws |
+| `data/ai/tiles/`, `data/ai/raw/` | yes | per-tile Gemini outputs |
+| `data/ai/state.json`, `mask.png` | yes | which tiles exist; coverage mask for `build_dataset.py` |
+| `data/build/final.png` | yes | plain-render composite — LoRA **control** at inference |
+| `data/build/scene.json` | yes | fused scene used by the renderer |
+| `data/raw/` (lidar.npz, naip.npz, osm.json) | **no** | 270 MB + 140 MB, over GitHub’s 100 MB file limit. Re-fetch. |
+| `data/build/objects.v`, `data/ai/massing.v` | **no** | 288 MB three.js dumps. Re-render. |
 
-**First job for the next agent if that VM is going away: copy `data/ai/lora_pairs/` (minimum) and ideally `data/build/final.png` + `data/ai/ai_final.png` onto Sherlock `$SCRATCH` or a tarball the owner keeps.** Without those files you must re-run `map:fetch` + `map:build` (hours of downloads + Chrome) and you **cannot** recreate Nano Banana without paying Gemini again.
+A fresh clone **can train**. Copy `data/ai/lora_pairs` onto Sherlock `$SCRATCH` (home quota is small) and run `sbatch experiments/qwen-lora/sherlock.sbatch`.
 
-`public/tiles/` (~27 MB of webp DZI) **is** committed. The viewer does not need `data/` to display the current maps.
+Clone the GitHub repo onto Sherlock `$SCRATCH` or `$GROUP_HOME`, not `$HOME`.
 
 ---
 
 ## What the next agent should do (in order)
-
-### 0. Persist training data
-
-Copy off the Cloud Agent VM before it is deleted:
-
-```bash
-# on Sherlock, after ssh aaditya1@login.sherlock.stanford.edu
-mkdir -p $SCRATCH/pixel-stanford
-# from wherever you can still reach data/:
-rsync -a data/ai/lora_pairs $SCRATCH/pixel-stanford/
-rsync -a data/build/final.png data/ai/ai_final.png data/ai/mask.png $SCRATCH/pixel-stanford/
-```
-
-Clone the GitHub repo onto Sherlock `$SCRATCH` or `$GROUP_HOME`, not `$HOME` (quota).
 
 ### 1. Train the LoRA on Sherlock
 
@@ -299,7 +287,7 @@ Do **not** burn more Gemini budget unless a landmark is still wrong after Qwen a
 - Do not call Nano Banana for the whole campus again. Teacher data is enough.
 - Do not treat 175 overlapping crops as a huge diverse dataset. Quality of the teacher caps the LoRA.
 - Do not change `config.py` camera / region if you still want Nano Banana tiles to align.
-- Do not commit `data/` (2 GB) or API keys. `.env*` is gitignored.
+- Do not commit `data/raw/` (lidar/NAIP) or API keys. `.env*` is gitignored. Do not add `*.v` render dumps.
 - Do not add a second UI library, auth, or a database.
 - Pixel Chennai style refs are **drawing technique only**. Do not copy Indian architecture onto Stanford.
 - Lake Lagunita is dry grass/sand in the 2024 photo. OSM “water” is filtered by NAIP on purpose.

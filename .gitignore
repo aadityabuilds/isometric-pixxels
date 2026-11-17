@@ -40,8 +40,17 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# pipeline
-/data/
+# Fetch/render dumps (lidar.npz is 270 MB). Re-run `npm run map:fetch` if missing.
+# AI teacher tiles, LoRA pairs, and the two full-campus PNGs ARE tracked.
+/data/*
+!/data/ai/
+!/data/ai/**
+/data/ai/massing.v
+/data/ai/tiles_backup/
+!/data/build/
+/data/build/*
+!/data/build/final.png
+!/data/build/scene.json
 /pipeline/.venv/
 __pycache__/
 /render/out/

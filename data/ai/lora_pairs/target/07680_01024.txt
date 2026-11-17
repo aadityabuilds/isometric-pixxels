@@ -1,0 +1,1 @@
+Redraw this isometric Stanford campus render as SimCity 2000 pixel art. Keep the camera, every building footprint, road, path, lawn and tree exactly in place. Buff sandstone or cream stucco, red clay tile roofs, crisp pixel outlines, empty campus. No people, no cars, no signs, no lettering.

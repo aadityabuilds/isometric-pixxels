@@ -1,0 +1,12 @@
+[general]
+resolution = [1024, 1024]
+caption_extension = ".txt"
+batch_size = 1
+enable_bucket = false
+num_repeats = 4
+
+[[datasets]]
+image_directory = "/agent/repos/tmp-6f958686e7a260dc/data/ai/lora_pairs/target"
+control_directory = "/agent/repos/tmp-6f958686e7a260dc/data/ai/lora_pairs/control"
+cache_directory = "/agent/repos/tmp-6f958686e7a260dc/data/ai/lora_pairs/cache"
+control_resolution = [1024, 1024]
