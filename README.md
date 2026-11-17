@@ -1,98 +1,337 @@
-# Pixel Stanford
+# Pixel Stanford — agent handoff
 
-A giant isometric map of Stanford's campus in the style of SimCity 2000, built entirely from open data, and it moves.
-Pan and zoom across ~2,400 building masses and ~57,000 trees, search any dorm, hall, library or café, take the
-32-stop tour, and watch students walk between classes, bikes rush at the top and bottom of the hour, cars circle Campus
-Drive and Marguerite shuttles run their published timetable.
+Isometric SimCity-style map of Stanford campus, from open data, with a live people/traffic layer and a Nano Banana illustrated overlay. The remaining job is to **fine-tune Qwen-Image-Edit-2511 on those Nano Banana tiles** and regenerate the campus locally on Sherlock so we stop paying Gemini.
 
-The map is a plain render drawn by code that is truthful from above (real heights, roof shapes, roof and ground
-colours). It is also the input for the planned AI-illustrated layer (see [Next: the AI layer](#next-the-ai-layer)).
+GitHub (source of truth as of 17 Nov 2026): https://github.com/aadityabuilds/isometric-pixxels
 
-## Run the app
+Owner: Aaditya Nalawade (`aadityabuilds` on GitHub and Hugging Face, `aaditya1@stanford.edu`). Hugging Face account is **free** (no Jobs). Training target is **Stanford Sherlock**, not this laptop and not HF Jobs.
+
+This file is the handoff for the next agent. Read it before changing anything.
+
+---
+
+## Current state (one paragraph)
+
+The app is a working Next.js viewer. You can pan/zoom a truthful-from-above isometric render of campus, search 845 named places, run a 32-stop tour, and watch students/bikes/cars/Marguerite shuttles on a live layer. Press **L** to toggle a second Deep Zoom pyramid: the same camera, redrawn tile-by-tile by Gemini Nano Banana 2.1 (~50 tiles, ~$4.07 including tests and west-campus fixes). Those tiles are **style targets**, not the end product. Training pairs (175 overlapping 1024×1024 crops: plain render → Nano Banana) are prepared. Training has **not** been run. There is no GPU on the machine that built this. Sherlock is the plan.
+
+---
+
+## How to run the app
 
 ```bash
+git clone https://github.com/aadityabuilds/isometric-pixxels.git
+cd isometric-pixxels
 npm install
 npm run dev          # http://localhost:4317
 ```
 
-The rendered map (`public/tiles/`), labels, tour, street network, shuttle schedule and sprites are committed, so the
-app runs without the data pipeline.
-
-### Using it
+Rendered tiles, labels, tour, street network, shuttle GTFS-derived trips and sprites are **committed**. The app runs without the Python pipeline and without `data/`.
 
 | Key | Action |
 | --- | --- |
-| `/` | Search dorms, halls, cafés and streets |
-| `P` | Places: the tour and the browse list |
-| `N` | Place and street names on or off |
-| `T` | People and traffic on or off |
+| `/` | Search dorms, halls, cafés, streets |
+| `P` | Places panel (tour + browse) |
+| `N` | Names on/off |
+| `L` | AI illustration vs plain render |
+| `T` | People and traffic on/off |
 | `F` | Full screen |
-| `H` | Hide tools (focus mode) |
+| `H` | Hide chrome |
 | `+` `−` `0` | Zoom in, out, whole campus |
-| `←` `→` | Previous / next tour stop |
+| `←` `→` | Tour prev/next |
+| `?` | About |
 
-Links are shareable: `#hoover-tower` opens a place, `#@x,y,zoom` an exact view, and `?time=class-change` (or
-`morning`, `lunch`, `evening`, `night`) replays a weekday at that time instead of showing live Pacific time.
+Shareable hashes: `#hoover-tower`, `#@x,y,zoom`. Query `?time=class-change` (or `morning`, `lunch`, `evening`, `night`) replays a weekday instead of live Pacific time.
 
-## How the map is made
+Stack: Next.js 16 + React 19 + Tailwind 4 + shadcn/ui + OpenSeadragon. Dev server is **port 4317** on purpose.
 
-| Step | Source | What it gives us |
-| --- | --- | --- |
-| Footprints, roads, paths, fields | [OpenStreetMap](https://www.openstreetmap.org) via Overpass | Building outlines (including hand-modelled parts such as Hoover Tower), the street, bike and footpath network, parking lots, pitches |
-| Heights, roof shapes, trees | [USGS 3DEP lidar](https://www.usgs.gov/3d-elevation-program), `CA_SantaClaraCounty_2020` (public EPT on AWS) | Roof height and pitch for every building, height regions inside merged footprints, individual tree tops and crowns |
-| Colours | [USDA NAIP](https://naip-usdaonline.hub.arcgis.com/) 2024, 0.6 m RGB + near-infrared (Microsoft Planetary Computer) | Real roof and ground colours, water vs. dry lakebed, tree colours |
-| Official names | Stanford LBRE Maps & Records public Map Maker service | Official building names and IDs, dorm complexes, libraries, eateries |
-| Shuttles | Stanford Transportation's public [Marguerite GTFS feed](https://transportation-forms.stanford.edu/google/google_transit.zip) | Routes, stops and timetables |
+---
 
-Pipeline (`pipeline/stanford_pixxel/`):
+## Repo map
 
-1. `fetch_*` download each source for a rectangle aligned to the campus street grid (14.4° off north).
-2. `build_scene.py` fuses them:
-   - roofs are classified from lidar slope; pitched roofs become hipped roofs with eave height and pitch measured from
-     the point cloud; flat roofs take the 85th-percentile height;
-   - footprints OpenStreetMap maps as one building (the Main Quad, the hospital) are split by clustering lidar roof
-     heights, so arcades, wings and Memorial Church get their own masses; stadiums get seating bowls;
-   - hand-modelled OSM parts (heights, roof shapes, domes) override lidar;
-   - trees are local maxima of the lidar canopy height model, grouped into broadleaf, oak, eucalyptus, conifer and palm,
-     and coloured from the aerial photo;
-   - open ground and rooftops show the posterised aerial photo; ground hidden under canopy and roofs falls back to a
-     landcover palette; OSM water is drawn only where the photo shows water (so Lake Lag is drawn as it was in 2024);
-   - every label, outline and coordinate is projected with the same orthographic camera.
-3. `network.py` exports the street, bike and footpath graph, parking stalls and Marguerite trips in map pixels.
-4. `render/` renders buildings and trees in headless Chrome with three.js (`capture.mjs`), and the live-layer sprite
-   atlas from tiny 3D models through the same camera (`sprites.mjs`). Hipped roofs come from CGAL's straight skeleton
-   (`straight-skeleton`, WebAssembly); windows and roof tiles are procedural; outlines come from depth edges.
-5. `compose.py` composites objects over the ground, cuts a versioned Deep Zoom pyramid with libvips, writes the
-   occlusion mask the live layer uses to hide agents behind buildings and trees, and cuts tour thumbnails.
-
-The viewer is Next.js + OpenSeadragon + shadcn/ui. The live layer (`src/lib/live/`) simulates agents on the network
-with typed arrays, draws them on a canvas synced to the map, and only re-renders React when the set of visible labels
-changes.
-
-### Rebuilding the map
-
-Requirements: Node 20+, [uv](https://docs.astral.sh/uv/), libvips (`apt install libvips-tools`), Google Chrome or
-Chromium (set `CHROME_PATH` if it is not at `/usr/local/bin/google-chrome`).
-
-```bash
-npm run map:fetch    # ~5 min: OSM, Stanford names, 90M lidar points, NAIP imagery, GTFS -> data/raw/
-npm run map:build    # ~4 min: scene, network, render, sprites, Deep Zoom tiles -> public/
+```
+src/                         Next.js viewer
+  app/page.tsx               loads tiles + tilesAi from public/data/places.json
+  components/campus-app.tsx  chrome, keyboard, AI/plain toggle
+  components/map/            OpenSeadragon + labels + live canvas
+  lib/live/                  agent sim (typed arrays, Pacific clock, class-change pulses)
+pipeline/stanford_pixxel/    open-data → scene → network → compose DZI
+render/                      three.js headless Chrome capture + sprite atlas
+public/tiles/6afa80bc/       plain-render Deep Zoom (committed)
+public/tiles/6afb855b-ai/    Nano Banana Deep Zoom (committed)
+public/data/places.json      845 places, camera, tiles, tilesAi, occlusion path
+experiments/style-test/      FLUX Kontext / schnell / Qwen Spaces tests (done)
+experiments/nanobanana/      Gemini campus redraw + west/Row seam fixes
+experiments/qwen-lora/       musubi-tuner dataset + Sherlock train/infer scripts
+data/                        GITIGNORED. See "Critical: data is not on GitHub"
 ```
 
-Tweak the region, camera angle or scale in `pipeline/stanford_pixxel/config.py`, tour stops in
-`pipeline/stanford_pixxel/tour.py`, and crowd sizes by time of day in `src/lib/live/clock.ts`.
+`places.json` currently points at:
 
-## Next: the AI layer
+- `tiles`: `/tiles/6afa80bc/campus.dzi`
+- `tilesAi`: `/tiles/6afb855b-ai/campus.dzi`
 
-Nano Banana 2.1 has already painted the campus (`public/tiles/*-ai/`, toggle with `L`). The original plan was
-never to keep calling Gemini: those tiles are **style targets** for a Qwen-Image-Edit-2511 LoRA.
+Canvas size: **10607 × 5660** px. Camera: orthographic, bearing **239.4°**, elevation **30°**, **3 px/m**, 2:1 isometric, aligned 45° off the campus grid (grid bearing 14.4°). Defined in `pipeline/stanford_pixxel/config.py`. Do not change the camera if you want existing Nano Banana tiles to still register.
 
-1. Cut paired 1024 px crops: `data/build/final.png` (control) → Nano Banana `data/ai/ai_final.png` (target).
-2. Train the LoRA on Sherlock with musubi-tuner (`experiments/qwen-lora/`).
-3. Generate the whole campus in overlapping windows (and average the overlap, so there are no seams).
-4. Keep the Nano Banana landmark tiles (Hoover, Memorial Church, the Quad) as the high-quality layer.
+---
+
+## What has been done
+
+### 1. Open-data isometric map (the “plain render”)
+
+Sources, all public:
+
+| Source | Use |
+| --- | --- |
+| OSM via Overpass | footprints, roads, paths, parking, pitches. Hand-modelled OSM parts (Hoover height/dome) override lidar |
+| USGS 3DEP lidar `CA_SantaClaraCounty_2020` | roof height, pitch, height-partitioned masses inside merged footprints (Quad arcades, Memorial Church, hospital wings, stadium bowl), ~57k tree crowns |
+| USDA NAIP 2024 0.6 m RGB+NIR | roof and ground colour, water vs dry lakebed |
+| Stanford LBRE Map Maker | official names / building IDs |
+| Marguerite GTFS | shuttle routes, stops, timetable |
+
+Pipeline:
+
+1. `npm run map:fetch` → `data/raw/`
+2. `build_scene.py` fuses geometry + colour
+3. `network.py` exports graph, parking stalls, shuttle trips in map pixels
+4. `render/capture.mjs` draws buildings/trees in headless Chrome (three.js). Hipped roofs via CGAL `straight-skeleton` WASM. Outlines from depth edges.
+5. `compose.py` composites over ground, cuts Deep Zoom with libvips, writes occlusion mask, tour thumbs.
+
+Rebuild (needs Node 20+, uv, libvips, Chrome/Chromium):
+
+```bash
+npm run map:fetch    # ~5 min
+npm run map:build    # ~4 min
+```
+
+The plain render is **truthful from above** (real footprints, heights, roof shapes, NAIP colours). Facades are procedural placeholders. That is why it is the **control image** for the edit model: geometry is right, style is not.
+
+Live layer (`src/lib/live/`): students walk between classes, bikes peak at hour/half-hour, cars on Campus Drive, Marguerite on GTFS. Occlusion mask hides agents behind buildings/trees. Crowd sizes by time of day live in `src/lib/live/clock.ts`.
+
+### 2. Style tests (open models, no training yet)
+
+`experiments/style-test/`
+
+| Model | Result |
+| --- | --- |
+| FLUX.1 Kontext [dev] (HF Space, anonymous) | Keeps layout, game-art look, ~30 s/tile. Non-commercial licence. |
+| FLUX.1 schnell (text only) | Pretty, invents a different campus. Useless as a map. |
+| Qwen-Image-Edit-2511 on public Spaces | Refused for anonymous users (GPU quota). Needs HF token or Sherlock. |
+| Qwen-Image-Edit-2511 + Lightning + Wikimedia photo of Memorial Church | Layout kept; photo refs actually pull real facades on tight crops. This is why Qwen-Image-**Edit** (not text-to-image) is the training target. |
+
+Comparison sheets are committed under `experiments/style-test/`.
+
+### 3. Nano Banana campus illustration (the “teacher”)
+
+`experiments/nanobanana/`
+
+Goal was never “Gemini forever.” Goal was a few dozen high-quality tiles to **teach a LoRA**.
+
+Per 1024 tile, Gemini saw:
+
+1. Massing layout (true geometry, blank walls), with already-finished neighbours pasted into the 128 px overlap
+2. 2024 NAIP aerial warped onto the same ground plane (follow Image 1 for position, Image 2 for colour)
+3. Approved Main Quad Nano Banana Pro tile as style anchor + one Pixel Chennai crop (style only, not architecture)
+4. Up to three Wikimedia photos near the tile
+5. Named buildings in the tile
+
+Grid: 1024 tiles, step 896 (128 px overlap). Model: **`gemini-nano-banana-2.1`**. Scripts:
+
+- `nb.py` — Gemini calls, costs to `ledger.jsonl`. Needs `GEMINI_API_KEY`.
+- `campus.py` — full campus pass, budget flag, `--redo x,y`
+- `campus_prep.py` — inputs
+- `publish_layer.py` — `vips dzsave` of `data/ai/ai_final.png` → `public/tiles/<hex>-ai/`, writes `tilesAi` into `places.json`
+- `fix_west.py` — **failed** (Pro model drifted camera, cartoon labels). Reverted.
+- `fix_west2.py` — 2K plates with 2.1 + strict layout. Lake + FloMo/Row geography.
+- `fix_row_seam.py` — Pearce Mitchell / The Row were split across two disagreeing tiles at x≈3300. Regenerated one 2048 plate at `(2280, 1570)` so the condo cluster is uncut, feathered into `ai_final.png`, recut DZI.
+
+Spend: **64 Gemini calls, $4.07** (61× 2.1, 3× Pro). Ledger: `experiments/nanobanana/ledger.jsonl`.
+
+User-visible bugs that were already fixed, do not reintroduce:
+
+- Lake Lagunita is a **dry seasonal oval** (2024 NAIP), not a water body and not a golf course. Roble / Lagunita Court / FloMo / Governor's Corner sit **outside** the trail ring.
+- West campus (FloMo, The Row) had wrong geography; redrawn as two coherent 2K plates.
+- Visible double-building seam on Pearce Mitchell / The Row from overlapping 1024 tiles that did not agree. Fixed by one uncut 2048 plate.
+
+Known remaining AI-layer flaws (expected; this is why we train Qwen instead of generating more Gemini tiles):
+
+- Tile-to-tile style drift and leftover seams away from the Row fix
+- Invented rooftop clutter, windows, sometimes lettering
+- Facades are not survey-accurate unless a Wikimedia photo was in-context
+- Lake still looks a bit cartoon/flat compared to the Quad
+
+### 4. Qwen-Image-Edit-2511 LoRA dataset (ready, not trained)
+
+`experiments/qwen-lora/`
+
+Same recipe as Pixel Chennai and Isometric NYC: **control = plain render, target = Nano Banana, train a small LoRA on Qwen-Image-Edit-2511, generate the rest locally.**
+
+```bash
+pipeline/.venv/bin/python experiments/qwen-lora/build_dataset.py
+```
+
+Writes `data/ai/lora_pairs/{control,target}/` (gitignored). **175** pairs, 1024×1024, step 512 over the finished maps, plus the exact Nano Banana tiles first. Crops with <28% coverage of the map mask are skipped. Same caption on every pair:
+
+> Redraw this isometric Stanford campus render as SimCity 2000 pixel art. Keep the camera, every building footprint, road, path, lawn and tree exactly in place. Buff sandstone or cream stucco, red clay tile roofs, crisp pixel outlines, empty campus. No people, no cars, no signs, no lettering.
+
+Preview sheet (committed): `experiments/qwen-lora/pairs_preview.jpg`.
+
+**175 is not 175 unique scenes.** It is a sliding window over ~50 Nano Banana tiles. Unique geography is one campus. Style LoRAs saturate fast: Isometric NYC used ~40 pairs for five boroughs. Extra overlapping crops mostly teach the teacher’s habits, including its mistakes. Do not expect “more pairs ⇒ much better map.” The real advantage over Pixel Chennai is the **control** (lidar roofs, real trees, NAIP), not pair count.
+
+Training scripts (not yet executed):
+
+- `dataset.toml` — musubi-tuner; paths filled by the train script
+- `train_sherlock.sh` — cache latents + text encoder, then `qwen_image_train_network.py` with `--model_version edit-2511`, LoRA rank 16, 16 epochs, adamw8bit, lr 5e-5, fp8, flow shift 2.2
+- `sherlock.sbatch` — Slurm: 1× L40S (or H100), 8 h, 64 GB RAM. Weights in `$SCRATCH/qwen-edit-2511`, output `$SCRATCH/pixel-stanford-lora`
+- `generate.py` — Diffusers `QwenImageEditPipeline` + LoRA, one control crop. First sanity check after training: control `04480_01792` (Quad/Hoover) should look like the Nano Banana target without calling Gemini.
+
+Weights to download onto Sherlock (flatten so the three files sit in `$SCRATCH/qwen-edit-2511`):
+
+```
+huggingface-cli download Comfy-Org/Qwen-Image-Edit_ComfyUI \
+  split_files/diffusion_models/qwen_image_edit_2511_bf16.safetensors --local-dir $SCRATCH/qwen-edit-2511
+huggingface-cli download Comfy-Org/Qwen-Image-Edit_ComfyUI \
+  split_files/vae/qwen_image_vae.safetensors --local-dir $SCRATCH/qwen-edit-2511
+huggingface-cli download Comfy-Org/Qwen-Image_ComfyUI \
+  split_files/text_encoders/qwen_2.5_vl_7b.safetensors --local-dir $SCRATCH/qwen-edit-2511
+```
+
+Plus clone `https://github.com/kohya-ss/musubi-tuner` to `third_party/musubi-tuner` (gitignored if you put it there; sbatch clones it).
+
+At inference, stack the [Lightning 4-step LoRA](https://huggingface.co/lightx2v/Qwen-Image-Lightning) for speed (Chennai did this on a Mac). Then denoise **overlapping 1024 windows of `data/build/final.png` and average the overlap** (tiny.london’s seam trick, not Chennai’s tile-by-tile). Keep Nano Banana Hoover / Memorial Church / Quad as hero patches if Qwen is softer there.
+
+### 5. Git / hosting
+
+- Code lives on GitHub: `aadityabuilds/isometric-pixxels`, branch `main`.
+- Cursor Cloud Agent GitHub App **cannot create repos**; the empty GitHub repo was created by hand, then history was pushed.
+- A Cursor Cloud publish of the web app was proposed as slug `pixel-stanford` (user confirms in the Publish dialog). Do not invent a preview URL.
+- Do not add auth, a database, or a second component library unless asked.
+
+---
+
+## Critical: `data/` is not on GitHub
+
+`.gitignore` excludes `/data/` (also `.venv`, `.next`, `render/out`, `render/dist`). A fresh clone **cannot train** and **cannot rebuild Nano Banana composites**.
+
+On the machine that produced this (Cursor Cloud Agent VM), `data/` is ~2 GB:
+
+| Path | Size | What |
+| --- | --- | --- |
+| `data/raw/` | ~421 MB | OSM, lidar, NAIP, GTFS, Stanford names |
+| `data/build/final.png` | (inside ~465 MB build) | plain-render composite — **LoRA control source** |
+| `data/ai/ai_final.png` | ~57 MB | Nano Banana composite — **LoRA target source** |
+| `data/ai/lora_pairs/` | ~144 MB | 175 jpg pairs + captions, ready to train |
+| `data/ai/tiles/`, `raw/`, backups | rest | per-tile Gemini outputs and `ai_final.before_*.png` backups |
+
+**First job for the next agent if that VM is going away: copy `data/ai/lora_pairs/` (minimum) and ideally `data/build/final.png` + `data/ai/ai_final.png` onto Sherlock `$SCRATCH` or a tarball the owner keeps.** Without those files you must re-run `map:fetch` + `map:build` (hours of downloads + Chrome) and you **cannot** recreate Nano Banana without paying Gemini again.
+
+`public/tiles/` (~27 MB of webp DZI) **is** committed. The viewer does not need `data/` to display the current maps.
+
+---
+
+## What the next agent should do (in order)
+
+### 0. Persist training data
+
+Copy off the Cloud Agent VM before it is deleted:
+
+```bash
+# on Sherlock, after ssh aaditya1@login.sherlock.stanford.edu
+mkdir -p $SCRATCH/pixel-stanford
+# from wherever you can still reach data/:
+rsync -a data/ai/lora_pairs $SCRATCH/pixel-stanford/
+rsync -a data/build/final.png data/ai/ai_final.png data/ai/mask.png $SCRATCH/pixel-stanford/
+```
+
+Clone the GitHub repo onto Sherlock `$SCRATCH` or `$GROUP_HOME`, not `$HOME` (quota).
+
+### 1. Train the LoRA on Sherlock
+
+Owner can SSH to Sherlock. This Cloud Agent could not: no SSH keys, Stanford Duo on `login.sherlock.stanford.edu`.
+
+```bash
+git clone https://github.com/aadityabuilds/isometric-pixxels.git
+cd isometric-pixxels
+export PAIRS=$SCRATCH/pixel-stanford/lora_pairs
+export MODELS=$SCRATCH/qwen-edit-2511
+export OUT=$SCRATCH/pixel-stanford-lora
+sbatch experiments/qwen-lora/sherlock.sbatch
+```
+
+If the L40S queue is long, edit `#SBATCH -C GPU_SKU:H100_SXM5`. Job is ~3–6 h once weights are downloaded. Keep the ~60 GB of base weights in `$SCRATCH`.
+
+Sanity check, on a GPU node:
+
+```bash
+python experiments/qwen-lora/generate.py \
+  --control $PAIRS/control/04480_01792.jpg \
+  --lora $OUT/pixel-stanford-qwen-edit.safetensors \
+  --out /tmp/qwen_quad.png
+```
+
+Compare `/tmp/qwen_quad.png` to `$PAIRS/target/04480_01792.jpg`. If Hoover/Church/Quad don’t match the teacher, stop and inspect checkpoints (`save_every_n_epochs 2`) rather than generating the whole campus.
+
+### 2. Generate the campus without Gemini
+
+Write a small loop (does not exist yet — `generate.py` is one tile only):
+
+- Slide 1024 windows over `data/build/final.png` with step 512
+- Run Qwen-Image-Edit-2511 + our LoRA + Lightning 4-step
+- Average overlapping pixels
+- Optional: paste original Nano Banana patches for Hoover, Memorial Church, Main Quad
+- Save `data/ai/qwen_final.png`
+- `python experiments/nanobanana/publish_layer.py` (point it at `qwen_final.png` or copy over `ai_final.png`) so `tilesAi` updates
+- Commit new `public/tiles/<new>-ai/` and the `places.json` `tilesAi` field
+
+Do **not** burn more Gemini budget unless a landmark is still wrong after Qwen and the owner asks.
+
+### 3. Only then, polish
+
+- Hunt seams at The Row, Lake Lag, Med School, Stadium
+- Mobile layout already exists; don’t restyle the chrome without a reason
+- Live layer is independent of the AI tiles; don’t break occlusion (`public/data/occlusion.bin.gz`)
+
+---
+
+## What not to do
+
+- Do not train on a CPU Cloud Agent VM. There is no NVIDIA GPU (`nvidia-smi` fails).
+- Do not use Hugging Face Jobs on `aadityabuilds` — not a Pro account.
+- Do not call Nano Banana for the whole campus again. Teacher data is enough.
+- Do not treat 175 overlapping crops as a huge diverse dataset. Quality of the teacher caps the LoRA.
+- Do not change `config.py` camera / region if you still want Nano Banana tiles to align.
+- Do not commit `data/` (2 GB) or API keys. `.env*` is gitignored.
+- Do not add a second UI library, auth, or a database.
+- Pixel Chennai style refs are **drawing technique only**. Do not copy Indian architecture onto Stanford.
+- Lake Lagunita is dry grass/sand in the 2024 photo. OSM “water” is filtered by NAIP on purpose.
+
+---
+
+## Comparisons (so you don’t re-research this)
+
+| | Pixel Chennai | Isometric NYC | tiny.london | Us |
+| --- | --- | --- | --- | --- |
+| Control | OSM extrusions | Google 3D tiles | Google 3D tiles | Lidar + OSM + NAIP |
+| Teacher | “a few” Nano Banana tiles | ~40 pairs | thousands of Gemini frames | ~50 Nano Banana tiles → 175 crops |
+| Train | Qwen-Image-Edit-2511 LoRA, Mac | Qwen Image-Edit LoRA, ~$12 / 4 h | Qwen-Image-2.1-Turbo LoRA, H100 | Same Edit-2511 LoRA, Sherlock, **not run yet** |
+| Seams | Hand-fixed | Masked 512 infill | Overlap + average | Plan: overlap + average |
+| Speed LoRA | Lightning 4-step | — | — | Lightning at inference |
+
+We are **not** copying tiny.london’s Gemini-every-frame pipeline.
+
+---
+
+## Secrets / accounts
+
+| Name | Status |
+| --- | --- |
+| `GEMINI_API_KEY` | Used for Nano Banana. Not in repo. Only needed if you redo a teacher tile. |
+| `HF_TOKEN` | Optional. Style tests used public Spaces; Qwen Spaces needed a token. Download of Edit-2511 weights on Sherlock may need `huggingface-cli login`. |
+| Sherlock | SUNet `aaditya1`. SSH + Duo from the owner’s machine. This agent never logged in. |
+
+Never paste secrets into chat. Never commit them.
+
+---
 
 ## Credits
 
-© OpenStreetMap contributors (ODbL) · USGS 3DEP lidar · USDA NAIP imagery · Stanford LBRE Maps & Records ·
-Stanford Transportation (Marguerite GTFS). Not affiliated with Stanford University.
+© OpenStreetMap contributors (ODbL) · USGS 3DEP lidar · USDA NAIP 2024 · Stanford LBRE Maps & Records · Stanford Transportation (Marguerite GTFS). Not affiliated with Stanford University. Inspired by Pixel Chennai, isometric.nyc, and tiny.london.
