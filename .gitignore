@@ -46,7 +46,6 @@ next-env.d.ts
 !/data/ai/
 !/data/ai/**
 /data/ai/massing.v
-/data/ai/tiles_backup/
 !/data/build/
 /data/build/*
 !/data/build/final.png
